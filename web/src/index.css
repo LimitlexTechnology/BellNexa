@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-primary: #00563F;
+    --color-secondary: #F4511E;
+    --color-accent: #E6AD00;
+  }
+
+  body {
+    background-color: #0F172A;
+    color: #F8FAFC;
+  }
+}
+
+/* Custom Glassmorphism & Animations */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-card {
+  background: rgba(30, 41, 59, 0.7);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glow-green {
+  box-shadow: 0 0 25px -5px rgba(0, 86, 63, 0.5);
+}
+
+.glow-orange {
+  box-shadow: 0 0 25px -5px rgba(244, 81, 30, 0.5);
+}
+
+.glow-gold {
+  box-shadow: 0 0 25px -5px rgba(230, 173, 0, 0.5);
+}
+
+/* Pulse Animation for Live Bell Indicator */
+@keyframes bell-ring {
+  0% { transform: rotate(0deg); }
+  10% { transform: rotate(14deg); }
+  20% { transform: rotate(-14deg); }
+  30% { transform: rotate(10deg); }
+  40% { transform: rotate(-10deg); }
+  50% { transform: rotate(6deg); }
+  60% { transform: rotate(-6deg); }
+  70% { transform: rotate(0deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.animate-bell {
+  animation: bell-ring 2s infinite ease-in-out;
+}
