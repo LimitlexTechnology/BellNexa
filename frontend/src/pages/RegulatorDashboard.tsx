@@ -370,7 +370,7 @@ export const RegulatorDashboard: React.FC = () => {
                   {ev.approval_status === 'draft' && (
                     <button
                       onClick={() => submitEventForApproval(ev.id)}
-                      className="px-3 py-1.5 bg-[#0A1B45] hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center space-x-1.5 transition"
+                      className="px-3 py-1.5 bg-[#0A1B45] hover:bg-[#102A5C] text-white rounded-lg text-xs font-bold flex items-center space-x-1.5 transition"
                     >
                       <Send className="w-3.5 h-3.5" />
                       <span>Submit for Approval</span>
@@ -644,7 +644,7 @@ export const RegulatorDashboard: React.FC = () => {
               <button
                 type="button"
                 onClick={() => handleSaveEvent(true)}
-                className="px-5 py-2.5 bg-[#0A1B45] hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition"
+                className="px-5 py-2.5 bg-[#0A1B45] hover:bg-[#102A5C] text-white text-xs font-black rounded-xl transition"
               >
                 Save & Submit for Principal
               </button>

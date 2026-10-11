@@ -187,7 +187,7 @@ export const Navbar: React.FC = () => {
 
             <div className="flex justify-end gap-2 border-t border-slate-800 pt-3">
               <button type="button" onClick={() => setIsSettingsOpen(false)} className="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-300">Cancel</button>
-              <button type="submit" className="px-3 py-2 bg-emerald-700 hover:bg-emerald-600 rounded-lg text-xs font-bold text-white">Save profile</button>
+              <button type="submit" className="px-3 py-2 bg-[#0A1B45] hover:bg-[#102A5C] rounded-lg text-xs font-bold text-white">Save profile</button>
             </div>
           </form>
         </div>

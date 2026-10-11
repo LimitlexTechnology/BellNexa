@@ -236,11 +236,11 @@ export const SchoolAdminDashboard: React.FC = () => {
   return (
     <div className="space-y-6 relative">
       {/* Vilac Header Banner */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-6 rounded-2xl bg-gradient-to-r from-vilac-darkgreen via-slate-900 to-slate-900 border border-vilac-green/30 shadow-2xl relative overflow-hidden">
-        <div className="absolute right-0 top-0 bottom-0 w-64 bg-gradient-to-l from-vilac-orange/10 to-transparent pointer-events-none" />
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-6 rounded-2xl bg-gradient-to-r from-bellnexa-navyDark via-slate-900 to-slate-900 border border-bellnexa-navy/30 shadow-2xl relative overflow-hidden">
+        <div className="absolute right-0 top-0 bottom-0 w-64 bg-gradient-to-l from-bellnexa-cyan/10 to-transparent pointer-events-none" />
         <div className="space-y-1 relative z-10">
           <div className="flex items-center space-x-2">
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-vilac-gold/20 text-vilac-gold border border-vilac-gold/30">
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-bellnexa-cyanBright/20 text-bellnexa-cyanBright border border-bellnexa-cyanBright/30">
               VILAC PILOT ACTIVE
             </span>
             <span className="text-xs text-slate-400 font-mono">Timezone: Africa/Accra (GMT+0)</span>
@@ -257,7 +257,7 @@ export const SchoolAdminDashboard: React.FC = () => {
         <div className="flex items-center space-x-4 bg-slate-950/80 p-3 rounded-xl border border-slate-800 relative z-10">
           <div className="text-right">
             <div className="text-[10px] uppercase font-mono text-slate-400">Accra School Local Time</div>
-            <div className="text-xl font-mono font-bold text-vilac-gold">{currentTime || '12:45:00'}</div>
+            <div className="text-xl font-mono font-bold text-bellnexa-cyanBright">{currentTime || '12:45:00'}</div>
           </div>
           <div className="w-px h-8 bg-slate-800" />
           <div>
@@ -293,7 +293,7 @@ export const SchoolAdminDashboard: React.FC = () => {
             </div>
             <div className="flex justify-between">
               <span>Audio Route:</span>
-              <span className="text-vilac-gold font-medium">Bluetooth Speaker Connected</span>
+              <span className="text-bellnexa-cyanBright font-medium">Bluetooth Speaker Connected</span>
             </div>
           </div>
         </div>
@@ -302,7 +302,7 @@ export const SchoolAdminDashboard: React.FC = () => {
         <div className="glass-card p-4 rounded-xl space-y-2 border border-slate-700">
           <div className="flex justify-between items-center text-xs">
             <span className="font-semibold text-slate-300 flex items-center">
-              <RefreshCw className="w-4 h-4 text-vilac-orange mr-1.5" /> Offline Sync Revision
+              <RefreshCw className="w-4 h-4 text-bellnexa-cyan mr-1.5" /> Offline Sync Revision
             </span>
             <span className="text-[10px] font-mono text-slate-400">Revision #1</span>
           </div>
@@ -323,10 +323,10 @@ export const SchoolAdminDashboard: React.FC = () => {
         </div>
 
         {/* Emergency Manual Trigger */}
-        <div className="glass-card p-4 rounded-xl space-y-2 border border-vilac-orange/30 bg-gradient-to-b from-slate-900 to-vilac-orange/10 flex flex-col justify-between">
+        <div className="glass-card p-4 rounded-xl space-y-2 border border-bellnexa-cyan/30 bg-gradient-to-b from-slate-900 to-bellnexa-cyan/10 flex flex-col justify-between">
           <div>
             <div className="text-xs font-bold text-white flex items-center space-x-1">
-              <ShieldAlert className="w-4 h-4 text-vilac-orange" />
+              <ShieldAlert className="w-4 h-4 text-bellnexa-cyan" />
               <span>Manual Emergency Override</span>
             </div>
             <p className="text-[11px] text-slate-400 mt-1">
@@ -335,7 +335,7 @@ export const SchoolAdminDashboard: React.FC = () => {
           </div>
           <button
             onClick={() => handleTestAudio('Emergency Bell Alert', 'Emergency announcement. All teachers and students please remain calm and follow safety protocols.', 3)}
-            className="w-full bg-vilac-orange hover:bg-cyan-600 text-white font-bold py-2 rounded-lg text-xs flex items-center justify-center space-x-1.5 shadow-lg shadow-vilac-orange/30 transition"
+            className="w-full bg-bellnexa-cyan hover:bg-cyan-600 text-white font-bold py-2 rounded-lg text-xs flex items-center justify-center space-x-1.5 shadow-lg shadow-bellnexa-cyan/30 transition"
           >
             <Volume2 className="w-4 h-4" />
             <span>Trigger Emergency Announcement (3x)</span>
@@ -345,9 +345,9 @@ export const SchoolAdminDashboard: React.FC = () => {
 
       {/* Audio Playback Test Banner */}
       {testAudioStatus && (
-        <div className="p-3 rounded-xl bg-vilac-green/20 border border-vilac-green/40 flex items-center justify-between text-xs text-white animate-pulse">
+        <div className="p-3 rounded-xl bg-bellnexa-navy/20 border border-bellnexa-navy/40 flex items-center justify-between text-xs text-white animate-pulse">
           <div className="flex items-center space-x-2">
-            <Volume2 className="w-4 h-4 text-vilac-gold animate-bounce" />
+            <Volume2 className="w-4 h-4 text-bellnexa-cyanBright animate-bounce" />
             <span>{testAudioStatus}</span>
           </div>
           <button onClick={() => { window.speechSynthesis.cancel(); setTestAudioStatus(null); setIsPlayingTest(false); }} className="text-slate-400 hover:text-white">
@@ -361,7 +361,7 @@ export const SchoolAdminDashboard: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-4">
           <div>
             <h3 className="text-sm font-bold text-white flex items-center space-x-2">
-              <Calendar className="w-4 h-4 text-vilac-gold" />
+              <Calendar className="w-4 h-4 text-bellnexa-cyanBright" />
               <span>Standard School Bell Timetable ({events.length} Events)</span>
             </h3>
             <p className="text-xs text-slate-400">
@@ -370,7 +370,7 @@ export const SchoolAdminDashboard: React.FC = () => {
           </div>
           <button
             onClick={handleOpenAddModal}
-            className="bg-vilac-green hover:bg-emerald-700 text-white font-semibold px-3.5 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-md shadow-vilac-green/20 transition"
+            className="bg-bellnexa-navy hover:bg-emerald-700 text-white font-semibold px-3.5 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-md shadow-bellnexa-navy/20 transition"
           >
             <Plus className="w-4 h-4" />
             <span>Add New Bell Alarm</span>
@@ -395,7 +395,7 @@ export const SchoolAdminDashboard: React.FC = () => {
               {events.map((evt) => (
                 <tr key={evt.id} className="hover:bg-slate-800/40 transition">
                   {/* Start Time */}
-                  <td className="py-3 px-3 font-mono font-bold text-vilac-gold text-sm">
+                  <td className="py-3 px-3 font-mono font-bold text-bellnexa-cyanBright text-sm">
                     {evt.start_time}
                   </td>
 
@@ -416,7 +416,7 @@ export const SchoolAdminDashboard: React.FC = () => {
 
                   {/* Repetition Badge */}
                   <td className="py-3 px-3">
-                    <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold bg-vilac-gold/15 text-vilac-gold border border-vilac-gold/30">
+                    <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold bg-bellnexa-cyanBright/15 text-bellnexa-cyanBright border border-bellnexa-cyanBright/30">
                       <RotateCw className="w-3 h-3" />
                       <span>{evt.repeat_count || 3}x (Thrice)</span>
                     </span>
@@ -434,7 +434,7 @@ export const SchoolAdminDashboard: React.FC = () => {
                             title={`Toggle ${day.label} alarm ${isDayActive ? 'Off' : 'On'}`}
                             className={`w-6 h-6 rounded-md font-mono text-[10px] font-bold transition flex items-center justify-center border ${
                               isDayActive
-                                ? 'bg-vilac-green/30 text-emerald-400 border-vilac-green/60 shadow-sm'
+                                ? 'bg-bellnexa-navy/30 text-emerald-400 border-bellnexa-navy/60 shadow-sm'
                                 : 'bg-slate-900 text-slate-600 border-slate-800 hover:text-slate-400'
                             }`}
                           >
@@ -464,9 +464,9 @@ export const SchoolAdminDashboard: React.FC = () => {
                     <button
                       onClick={() => handleTestAudio(evt.event_name, evt.announcement_text, evt.repeat_count || 3)}
                       title={`Test Audio Playback (${evt.repeat_count || 3}x)`}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-vilac-green/30 text-slate-300 hover:text-white transition"
+                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-bellnexa-navy/30 text-slate-300 hover:text-white transition"
                     >
-                      <Play className="w-3.5 h-3.5 text-vilac-gold" />
+                      <Play className="w-3.5 h-3.5 text-bellnexa-cyanBright" />
                     </button>
                     <button
                       onClick={() => handleOpenEditModal(evt)}
@@ -497,7 +497,7 @@ export const SchoolAdminDashboard: React.FC = () => {
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="text-base font-bold text-white flex items-center space-x-2">
-                <Edit3 className="w-4 h-4 text-vilac-gold" />
+                <Edit3 className="w-4 h-4 text-bellnexa-cyanBright" />
                 <span>{events.some(e => e.id === editingEvent.id) ? 'Edit Bell Event' : 'Add New Bell Event'}</span>
               </h3>
               <button
@@ -519,7 +519,7 @@ export const SchoolAdminDashboard: React.FC = () => {
                   placeholder="e.g. Snack Break Bell"
                   value={editingEvent.event_name || ''}
                   onChange={(e) => setEditingEvent({ ...editingEvent, event_name: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-vilac-green"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-bellnexa-navy"
                 />
               </div>
 
@@ -532,7 +532,7 @@ export const SchoolAdminDashboard: React.FC = () => {
                     required
                     value={editingEvent.start_time || '08:00'}
                     onChange={(e) => setEditingEvent({ ...editingEvent, start_time: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-vilac-green"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-bellnexa-navy"
                   />
                 </div>
 
@@ -541,7 +541,7 @@ export const SchoolAdminDashboard: React.FC = () => {
                   <select
                     value={editingEvent.category || 'custom'}
                     onChange={(e) => setEditingEvent({ ...editingEvent, category: e.target.value as EventCategory })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-vilac-green"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-bellnexa-navy"
                   >
                     <option value="morning_assembly">Morning Assembly</option>
                     <option value="lesson_commencement">Lesson Commencement</option>
@@ -560,7 +560,7 @@ export const SchoolAdminDashboard: React.FC = () => {
                   <select
                     value={editingEvent.repeat_count || 3}
                     onChange={(e) => setEditingEvent({ ...editingEvent, repeat_count: parseInt(e.target.value, 10) })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold text-vilac-gold focus:outline-none focus:border-vilac-green"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold text-bellnexa-cyanBright focus:outline-none focus:border-bellnexa-navy"
                   >
                     <option value={3}>3x - Repeat Thrice (Default)</option>
                     <option value={2}>2x - Repeat Twice</option>
@@ -578,7 +578,7 @@ export const SchoolAdminDashboard: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleTestAudio(editingEvent.event_name || 'Preview', editingEvent.announcement_text, editingEvent.repeat_count || 3)}
-                    className="text-[10px] text-vilac-gold hover:underline flex items-center space-x-1"
+                    className="text-[10px] text-bellnexa-cyanBright hover:underline flex items-center space-x-1"
                   >
                     <Play className="w-3 h-3" />
                     <span>Test Speech ({editingEvent.repeat_count || 3}x Thrice)</span>
@@ -589,7 +589,7 @@ export const SchoolAdminDashboard: React.FC = () => {
                   placeholder="e.g. Good morning students, please assemble in the central hall."
                   value={editingEvent.announcement_text || ''}
                   onChange={(e) => setEditingEvent({ ...editingEvent, announcement_text: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-vilac-green"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-bellnexa-navy"
                 />
               </div>
 
@@ -612,7 +612,7 @@ export const SchoolAdminDashboard: React.FC = () => {
                         }}
                         className={`py-2 rounded-lg font-mono text-xs font-bold border transition ${
                           isSelected
-                            ? 'bg-vilac-green text-white border-emerald-400 shadow-md shadow-vilac-green/30'
+                            ? 'bg-bellnexa-navy text-white border-emerald-400 shadow-md shadow-bellnexa-navy/30'
                             : 'bg-slate-900 text-slate-500 border-slate-800 hover:text-slate-300'
                         }`}
                       >
@@ -634,7 +634,7 @@ export const SchoolAdminDashboard: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-vilac-green hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-xl text-xs flex items-center justify-center space-x-1.5 shadow-lg shadow-vilac-green/30 transition"
+                  className="flex-1 bg-bellnexa-navy hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-xl text-xs flex items-center justify-center space-x-1.5 shadow-lg shadow-bellnexa-navy/30 transition"
                 >
                   <Save className="w-4 h-4" />
                   <span>Save Bell Event</span>

@@ -51,11 +51,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
               onClick={() => setActiveTab(item.id)}
               className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
                 isActive
-                  ? 'bg-vilac-green/20 text-white border border-vilac-green/40 shadow-sm'
+                  ? 'bg-bellnexa-navy/20 text-white border border-bellnexa-navy/40 shadow-sm'
                   : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
               }`}
             >
-              <Icon className={`w-4 h-4 ${isActive ? 'text-vilac-gold' : 'text-slate-400'}`} />
+              <Icon className={`w-4 h-4 ${isActive ? 'text-bellnexa-cyanBright' : 'text-slate-400'}`} />
               <span>{item.label}</span>
             </button>
           );
@@ -64,7 +64,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
 
       {/* Current school workspace */}
       <div className="p-3 rounded-xl bg-gradient-to-b from-slate-800/80 to-slate-900 border border-slate-800 text-xs">
-        <div className="flex items-center space-x-2 text-vilac-gold font-semibold mb-1">
+        <div className="flex items-center space-x-2 text-bellnexa-cyanBright font-semibold mb-1">
           <Building2 className="w-3.5 h-3.5" />
           <span>Vilac International School</span>
         </div>

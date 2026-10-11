@@ -7,13 +7,25 @@ export default {
   theme: {
     extend: {
       colors: {
-        vilac: {
-          green: '#0A1B45',
-          darkgreen: '#07142F',
-          lightgreen: '#E7F9FC',
-          orange: '#12C8E8',
-          gold: '#54DDF4',
-          cream: '#F1FCFE',
+        slate: {
+          50: '#F3F8FF',
+          100: '#DFEAF8',
+          200: '#C5D5EB',
+          300: '#9FB4D4',
+          400: '#7892BA',
+          500: '#55719A',
+          600: '#3C5780',
+          700: '#263F68',
+          800: '#1A3158',
+          900: '#10244A',
+          950: '#07142F',
+        },
+        bellnexa: {
+          navy: '#0A1B45',
+          navyDark: '#07142F',
+          cyan: '#12C8E8',
+          cyanBright: '#54DDF4',
+          mist: '#E7F9FC',
         },
         brand: {
           primary: 'var(--color-primary, #0A1B45)',

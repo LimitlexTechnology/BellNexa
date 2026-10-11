@@ -726,7 +726,7 @@ export const SuperAdminDashboard: React.FC = () => {
                   </button>
                   <button
                     onClick={() => approvePendingItem(item.id)}
-                    className="px-5 py-2.5 bg-[#0A1B45] hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-lg transition flex items-center space-x-2"
+                    className="px-5 py-2.5 bg-[#0A1B45] hover:bg-[#102A5C] text-white rounded-xl text-xs font-black shadow-lg transition flex items-center space-x-2"
                   >
                     <Check className="w-4 h-4" /><span>Approve & Push to Phone</span>
                   </button>
@@ -808,7 +808,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 <div className="flex items-center space-x-2 self-end md:self-center">
                   <button onClick={() => playTestChime(ev.event_name, ev.announcement_text, ev.repeat_count || 3)} title="Test Play (chime + repeated voice announcement)" className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition"><Play className="w-3.5 h-3.5" /></button>
                   {ev.approval_status === 'draft' && (
-                    <button onClick={() => submitEventForApproval(ev.id)} className="px-3 py-1.5 bg-[#0A1B45] hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center space-x-1 transition">
+                    <button onClick={() => submitEventForApproval(ev.id)} className="px-3 py-1.5 bg-[#0A1B45] hover:bg-[#102A5C] text-white rounded-lg text-xs font-bold flex items-center space-x-1 transition">
                       <Send className="w-3.5 h-3.5" /><span>Submit</span>
                     </button>
                   )}
@@ -1061,7 +1061,7 @@ export const SuperAdminDashboard: React.FC = () => {
             <div className="flex justify-end space-x-2 pt-3 border-t border-slate-800">
               <button onClick={() => setIsAddModalOpen(false)} className="px-4 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl hover:bg-slate-700 transition">Cancel</button>
               <button onClick={() => saveEvent(false)} className="px-4 py-2.5 bg-slate-800 text-amber-300 border border-amber-800/60 text-xs font-bold rounded-xl hover:bg-slate-700 transition">Save as Draft</button>
-              <button onClick={() => saveEvent(true)} className="px-5 py-2.5 bg-[#0A1B45] hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition">Save & Approve Instantly</button>
+              <button onClick={() => saveEvent(true)} className="px-5 py-2.5 bg-[#0A1B45] hover:bg-[#102A5C] text-white text-xs font-black rounded-xl transition">Save & Approve Instantly</button>
             </div>
           </div>
         </div>

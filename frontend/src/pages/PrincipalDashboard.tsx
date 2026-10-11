@@ -341,7 +341,7 @@ export const PrincipalDashboard: React.FC = () => {
 
                     <button
                       onClick={() => approvePendingItem(item.id)}
-                      className="px-5 py-2.5 bg-[#0A1B45] hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-lg shadow-emerald-950/50 transition flex items-center space-x-2"
+                      className="px-5 py-2.5 bg-[#0A1B45] hover:bg-[#102A5C] text-white rounded-xl text-xs font-black shadow-lg shadow-[#07142F]/50 transition flex items-center space-x-2"
                     >
                       <Check className="w-4 h-4" />
                       <span>Approve & Push to Bell Phone</span>
