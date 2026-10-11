@@ -295,7 +295,7 @@ export const SuperAdminDashboard: React.FC = () => {
       <div className="space-y-6">
         {/* Header */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-          <div className="flex items-center space-x-2 text-[#F4511E] text-xs font-bold mb-1">
+          <div className="flex items-center space-x-2 text-[#12C8E8] text-xs font-bold mb-1">
             <Shield className="w-4 h-4" />
             <span className="uppercase tracking-wider">Super Admin — Platform Governance</span>
           </div>
@@ -334,7 +334,7 @@ export const SuperAdminDashboard: React.FC = () => {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {schools.map((school) => (
-              <div key={school.id} className="text-left bg-slate-900 border border-slate-800 hover:border-[#F4511E] hover:shadow-lg hover:shadow-orange-950/30 rounded-2xl p-5 transition-all duration-150 space-y-4">
+              <div key={school.id} className="text-left bg-slate-900 border border-slate-800 hover:border-[#12C8E8] hover:shadow-lg hover:shadow-cyan-950/30 rounded-2xl p-5 transition-all duration-150 space-y-4">
                 <button
                   onClick={() => { setSelectedSchool(school); setActiveTab('overview'); }}
                   className="group w-full text-left space-y-4"
@@ -356,7 +356,7 @@ export const SuperAdminDashboard: React.FC = () => {
 
                 {/* School name */}
                 <div>
-                  <h3 className="text-base font-black text-white group-hover:text-[#F4511E] transition-colors">
+                  <h3 className="text-base font-black text-white group-hover:text-[#12C8E8] transition-colors">
                     {school.name}
                   </h3>
                   <p className="text-[11px] text-slate-400 mt-0.5">{school.timezone}</p>
@@ -368,7 +368,7 @@ export const SuperAdminDashboard: React.FC = () => {
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                     <span className="font-medium">Device Online</span>
                   </div>
-                  <div className="flex items-center space-x-1 text-slate-400 group-hover:text-[#F4511E] transition-colors font-bold">
+                  <div className="flex items-center space-x-1 text-slate-400 group-hover:text-[#12C8E8] transition-colors font-bold">
                     <span>Enter</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </div>
@@ -459,7 +459,7 @@ export const SuperAdminDashboard: React.FC = () => {
 
           <div>
             <div className="flex items-center space-x-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#F4511E]/15 text-[#F4511E] border border-[#F4511E]/30">
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#12C8E8]/15 text-[#12C8E8] border border-[#12C8E8]/30">
                 Super Admin Full Access
               </span>
               <span className="text-[10px] font-mono text-slate-400">Rev #{scheduleRevision}</span>
@@ -524,14 +524,14 @@ export const SuperAdminDashboard: React.FC = () => {
             onClick={() => setActiveTab(id)}
             className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
               activeTab === id
-                ? 'bg-[#00563F] text-white shadow-sm'
+                ? 'bg-[#0A1B45] text-white shadow-sm'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
             }`}
           >
             <Icon className="w-3.5 h-3.5" />
             <span>{label}</span>
             {badge !== undefined && badge > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-[#F4511E] text-white font-extrabold">
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-[#12C8E8] text-white font-extrabold">
                 {badge}
               </span>
             )}
@@ -550,10 +550,10 @@ export const SuperAdminDashboard: React.FC = () => {
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
               <div className="flex items-center justify-between text-slate-400">
                 <span className="text-[11px] font-bold uppercase tracking-wider">Next Bell</span>
-                <Clock className="w-4 h-4 text-[#E6AD00]" />
+                <Clock className="w-4 h-4 text-[#54DDF4]" />
               </div>
               <div className="text-lg font-black text-white">{nextBell?.event_name || 'None today'}</div>
-              <div className="text-3xl font-black font-mono text-[#E6AD00]">{getCountdown()}</div>
+              <div className="text-3xl font-black font-mono text-[#54DDF4]">{getCountdown()}</div>
               <div className="text-[11px] text-slate-400 font-mono">Fires at {nextBell?.start_time || '--:--'} &bull; ×{nextBell?.repeat_count || 3}</div>
             </div>
 
@@ -580,7 +580,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Schedule Rev:</span>
-                  <span className="font-mono text-[#E6AD00]">#{scheduleRevision}</span>
+                  <span className="font-mono text-[#54DDF4]">#{scheduleRevision}</span>
                 </div>
               </div>
             </div>
@@ -696,8 +696,8 @@ export const SuperAdminDashboard: React.FC = () => {
               <div key={item.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center space-x-3">
-                    <div className="p-2.5 rounded-xl bg-orange-500/10 border border-orange-500/20">
-                      {item.type === 'audio_upload' ? <FileAudio className="w-5 h-5 text-[#F4511E]" /> : <Calendar className="w-5 h-5 text-[#F4511E]" />}
+                    <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20">
+                      {item.type === 'audio_upload' ? <FileAudio className="w-5 h-5 text-[#12C8E8]" /> : <Calendar className="w-5 h-5 text-[#12C8E8]" />}
                     </div>
                     <div>
                       <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{item.type.replace(/_/g,' ')} &bull; {item.submitted_at}</div>
@@ -726,7 +726,7 @@ export const SuperAdminDashboard: React.FC = () => {
                   </button>
                   <button
                     onClick={() => approvePendingItem(item.id)}
-                    className="px-5 py-2.5 bg-[#00563F] hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-lg transition flex items-center space-x-2"
+                    className="px-5 py-2.5 bg-[#0A1B45] hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-lg transition flex items-center space-x-2"
                   >
                     <Check className="w-4 h-4" /><span>Approve & Push to Phone</span>
                   </button>
@@ -758,7 +758,7 @@ export const SuperAdminDashboard: React.FC = () => {
               <button onClick={() => playTestChime('Westminster Bell Test')} className="flex items-center space-x-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition">
                 <Play className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400" /><span>Test Play</span>
               </button>
-              <button onClick={openAddModal} className="flex items-center space-x-1.5 px-4 py-2 bg-[#F4511E] hover:bg-[#D84315] text-white rounded-xl text-xs font-black shadow-md transition">
+              <button onClick={openAddModal} className="flex items-center space-x-1.5 px-4 py-2 bg-[#12C8E8] hover:bg-[#087F9B] text-white rounded-xl text-xs font-black shadow-md transition">
                 <Plus className="w-4 h-4" /><span>Add Event</span>
               </button>
             </div>
@@ -771,7 +771,7 @@ export const SuperAdminDashboard: React.FC = () => {
               return (
                 <button key={d.id} onClick={() => setSelectedDay(d.id)}
                   className={`flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 ${
-                    selectedDay === d.id ? 'bg-[#00563F] text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                    selectedDay === d.id ? 'bg-[#0A1B45] text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'
                   }`}>
                   <span>{d.name}</span>
                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${selectedDay === d.id ? 'bg-emerald-950 text-emerald-300' : 'bg-slate-800 text-slate-400'}`}>{cnt}</span>
@@ -808,7 +808,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 <div className="flex items-center space-x-2 self-end md:self-center">
                   <button onClick={() => playTestChime(ev.event_name, ev.announcement_text, ev.repeat_count || 3)} title="Test Play (chime + repeated voice announcement)" className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition"><Play className="w-3.5 h-3.5" /></button>
                   {ev.approval_status === 'draft' && (
-                    <button onClick={() => submitEventForApproval(ev.id)} className="px-3 py-1.5 bg-[#00563F] hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center space-x-1 transition">
+                    <button onClick={() => submitEventForApproval(ev.id)} className="px-3 py-1.5 bg-[#0A1B45] hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center space-x-1 transition">
                       <Send className="w-3.5 h-3.5" /><span>Submit</span>
                     </button>
                   )}
@@ -834,7 +834,7 @@ export const SuperAdminDashboard: React.FC = () => {
           {/* Audio upload */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
             <div className="flex items-center space-x-2">
-              <FileAudio className="w-4 h-4 text-[#F4511E]" />
+              <FileAudio className="w-4 h-4 text-[#12C8E8]" />
               <h3 className="text-sm font-bold text-white">Stage Audio Announcement</h3>
             </div>
             {audioSuccess && (
@@ -847,14 +847,14 @@ export const SuperAdminDashboard: React.FC = () => {
                 <label className="block text-xs font-bold text-slate-400 mb-1">Announcement Title</label>
                 <input type="text" required value={audioTitle} onChange={e => setAudioTitle(e.target.value)}
                   placeholder="e.g. End of Term Chime"
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#F4511E]" />
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#12C8E8]" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-400 mb-1">Duration (seconds)</label>
                 <input type="number" min={5} max={180} value={audioDuration} onChange={e => setAudioDuration(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-[#F4511E]" />
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-[#12C8E8]" />
               </div>
-              <button type="submit" className="px-4 py-2.5 bg-[#F4511E] hover:bg-[#D84315] text-white rounded-xl text-xs font-black transition flex items-center justify-center space-x-1.5 shadow">
+              <button type="submit" className="px-4 py-2.5 bg-[#12C8E8] hover:bg-[#087F9B] text-white rounded-xl text-xs font-black transition flex items-center justify-center space-x-1.5 shadow">
                 <Upload className="w-4 h-4" /><span>Stage & Submit</span>
               </button>
             </form>
@@ -870,7 +870,7 @@ export const SuperAdminDashboard: React.FC = () => {
           {/* Issue form */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
             <div>
-              <div className="flex items-center space-x-2 text-[#F4511E] text-xs font-bold mb-1">
+              <div className="flex items-center space-x-2 text-[#12C8E8] text-xs font-bold mb-1">
                 <Key className="w-4 h-4" /><span>Super Admin Exclusive</span>
               </div>
               <h3 className="text-base font-bold text-white">Invite Principal or Regulator</h3>
@@ -885,10 +885,10 @@ export const SuperAdminDashboard: React.FC = () => {
                     <button key={r} type="button" onClick={() => setInviteRole(r)}
                       className={`p-3 rounded-xl font-bold text-left border transition ${
                         inviteRole === r
-                          ? r === 'principal' ? 'bg-emerald-950/80 border-emerald-500 text-white' : 'bg-orange-950/80 border-orange-500 text-white'
+                          ? r === 'principal' ? 'bg-emerald-950/80 border-emerald-500 text-white' : 'bg-cyan-950/80 border-cyan-500 text-white'
                           : 'bg-slate-950 border-slate-800 text-slate-400'
                       }`}>
-                      <div className={`font-extrabold ${r === 'principal' ? 'text-emerald-400' : 'text-[#F4511E]'}`}>
+                      <div className={`font-extrabold ${r === 'principal' ? 'text-emerald-400' : 'text-[#12C8E8]'}`}>
                         {r === 'principal' ? 'Principal' : 'Schedule Regulator'}
                       </div>
                       <div className="text-[10px] text-slate-400 mt-0.5">
@@ -903,23 +903,23 @@ export const SuperAdminDashboard: React.FC = () => {
                 <label className="block font-bold text-slate-300 mb-1">Recipient Email</label>
                 <input type="email" required value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
                   placeholder={`e.g. ${inviteRole}@${selectedSchool.code.toLowerCase()}.edu.gh`}
-                  className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-[#F4511E]" />
+                  className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-[#12C8E8]" />
               </div>
 
-              <button type="submit" className="w-full py-3 bg-[#F4511E] hover:bg-[#D84315] text-white font-extrabold rounded-xl shadow-lg transition flex items-center justify-center space-x-2">
+              <button type="submit" className="w-full py-3 bg-[#12C8E8] hover:bg-[#087F9B] text-white font-extrabold rounded-xl shadow-lg transition flex items-center justify-center space-x-2">
                 <Send className="w-4 h-4" /><span>Generate Token</span>
               </button>
             </form>
 
             {generatedToken && (
-              <div className="p-3 rounded-xl bg-orange-950/30 border border-orange-700/50 space-y-2">
-                <div className="flex items-center justify-between text-[10px] font-bold uppercase text-orange-400">
+              <div className="p-3 rounded-xl bg-cyan-950/30 border border-cyan-700/50 space-y-2">
+                <div className="flex items-center justify-between text-[10px] font-bold uppercase text-cyan-400">
                   <span>Generated Token</span>
                   {copyOk && <span className="text-emerald-400">Copied!</span>}
                 </div>
                 <div className="flex items-center justify-between p-2 bg-slate-950 border border-slate-800 rounded-lg font-mono text-xs text-white">
                   <span>{generatedToken}</span>
-                  <button onClick={() => copyToken(generatedToken)} className="p-1 hover:text-[#E6AD00]"><Copy className="w-4 h-4" /></button>
+                  <button onClick={() => copyToken(generatedToken)} className="p-1 hover:text-[#54DDF4]"><Copy className="w-4 h-4" /></button>
                 </div>
               </div>
             )}
@@ -936,11 +936,11 @@ export const SuperAdminDashboard: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-white">{inv.email}</span>
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                      inv.role === 'principal' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-orange-950 text-orange-300 border border-orange-800'
+                      inv.role === 'principal' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-cyan-950 text-cyan-300 border border-cyan-800'
                     }`}>{inv.role}</span>
                   </div>
                   <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-                    <span className="text-[#E6AD00]">{inv.token}</span>
+                    <span className="text-[#54DDF4]">{inv.token}</span>
                     <span>Expires: {inv.expires_at}</span>
                   </div>
                   <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-800/80">
@@ -996,13 +996,13 @@ export const SuperAdminDashboard: React.FC = () => {
               <div>
                 <label className="block font-bold text-slate-300 mb-1">Event Name</label>
                 <input type="text" value={formName} onChange={e => setFormName(e.target.value)} placeholder="e.g. Science Lab Transition"
-                  className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#F4511E]" />
+                  className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#12C8E8]" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-300 mb-1">Category</label>
                   <select value={formCategory} onChange={e => setFormCategory(e.target.value as EventCategory)}
-                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#F4511E]">
+                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#12C8E8]">
                     <option value="morning_assembly">Morning Assembly</option>
                     <option value="lesson_commencement">Lesson Commencement</option>
                     <option value="lesson_change">Lesson Change</option>
@@ -1016,7 +1016,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 <div>
                   <label className="block font-bold text-slate-300 mb-1">Start Time</label>
                   <input type="time" value={formTime} onChange={e => setFormTime(e.target.value)}
-                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:outline-none focus:border-[#F4511E]" />
+                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:outline-none focus:border-[#12C8E8]" />
                 </div>
               </div>
               <div>
@@ -1027,7 +1027,7 @@ export const SuperAdminDashboard: React.FC = () => {
                     return (
                       <button key={d.id} type="button"
                         onClick={() => setFormDays(active ? formDays.filter(id => id !== d.id) : [...formDays, d.id])}
-                        className={`px-3 py-1.5 rounded-lg font-bold transition ${active ? 'bg-[#00563F] text-white' : 'bg-slate-950 border border-slate-800 text-slate-400'}`}>
+                        className={`px-3 py-1.5 rounded-lg font-bold transition ${active ? 'bg-[#0A1B45] text-white' : 'bg-slate-950 border border-slate-800 text-slate-400'}`}>
                         {d.short}
                       </button>
                     );
@@ -1038,13 +1038,13 @@ export const SuperAdminDashboard: React.FC = () => {
                 <label className="block font-bold text-slate-300 mb-1">Voice Announcement</label>
                 <textarea rows={2} value={formAnnouncement} onChange={e => setFormAnnouncement(e.target.value)}
                   placeholder="Announcement text read over PA system..."
-                  className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#F4511E]" />
+                  className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#12C8E8]" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-300 mb-1">Repetitions</label>
                   <select value={formRepeatCount} onChange={e => setFormRepeatCount(Number(e.target.value))}
-                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#F4511E]">
+                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#12C8E8]">
                     <option value={1}>1× Once</option>
                     <option value={2}>2× Twice</option>
                     <option value={3}>3× Thrice (default)</option>
@@ -1053,7 +1053,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 <div>
                   <label className="block font-bold text-slate-300 mb-1">Volume ({formVolume}%)</label>
                   <input type="range" min={40} max={100} value={formVolume} onChange={e => setFormVolume(Number(e.target.value))}
-                    className="w-full mt-2 accent-[#F4511E]" />
+                    className="w-full mt-2 accent-[#12C8E8]" />
                 </div>
               </div>
             </div>
@@ -1061,7 +1061,7 @@ export const SuperAdminDashboard: React.FC = () => {
             <div className="flex justify-end space-x-2 pt-3 border-t border-slate-800">
               <button onClick={() => setIsAddModalOpen(false)} className="px-4 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl hover:bg-slate-700 transition">Cancel</button>
               <button onClick={() => saveEvent(false)} className="px-4 py-2.5 bg-slate-800 text-amber-300 border border-amber-800/60 text-xs font-bold rounded-xl hover:bg-slate-700 transition">Save as Draft</button>
-              <button onClick={() => saveEvent(true)} className="px-5 py-2.5 bg-[#00563F] hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition">Save & Approve Instantly</button>
+              <button onClick={() => saveEvent(true)} className="px-5 py-2.5 bg-[#0A1B45] hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition">Save & Approve Instantly</button>
             </div>
           </div>
         </div>

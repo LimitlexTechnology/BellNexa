@@ -145,7 +145,7 @@ export const PrincipalDashboard: React.FC = () => {
           <VilacEmblem size="md" className="hidden sm:inline-flex" />
           <div>
             <div className="flex items-center space-x-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-[#E6AD00] bg-amber-950/40 border border-amber-800/60 px-2 py-0.5 rounded">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#54DDF4] bg-amber-950/40 border border-amber-800/60 px-2 py-0.5 rounded">
                 Principal Oversight
               </span>
               <span className="text-xs text-slate-400 font-mono">
@@ -202,14 +202,14 @@ export const PrincipalDashboard: React.FC = () => {
           onClick={() => setActiveTab('approvals')}
           className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
             activeTab === 'approvals'
-              ? 'bg-[#00563F] text-white shadow-sm'
+              ? 'bg-[#0A1B45] text-white shadow-sm'
               : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
           }`}
         >
           <UserCheck className="w-4 h-4" />
           <span>Pending Approvals</span>
           {pendingApprovals.length > 0 && (
-            <span className="ml-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono bg-[#F4511E] text-white font-extrabold">
+            <span className="ml-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono bg-[#12C8E8] text-white font-extrabold">
               {pendingApprovals.length}
             </span>
           )}
@@ -219,7 +219,7 @@ export const PrincipalDashboard: React.FC = () => {
           onClick={() => setActiveTab('glance')}
           className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
             activeTab === 'glance'
-              ? 'bg-[#00563F] text-white shadow-sm'
+              ? 'bg-[#0A1B45] text-white shadow-sm'
               : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
           }`}
         >
@@ -231,7 +231,7 @@ export const PrincipalDashboard: React.FC = () => {
           onClick={() => setActiveTab('history')}
           className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
             activeTab === 'history'
-              ? 'bg-[#00563F] text-white shadow-sm'
+              ? 'bg-[#0A1B45] text-white shadow-sm'
               : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
           }`}
         >
@@ -274,11 +274,11 @@ export const PrincipalDashboard: React.FC = () => {
                 >
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
                     <div className="flex items-center space-x-3">
-                      <div className="p-2.5 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                      <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
                         {item.type === 'audio_upload' ? (
-                          <FileAudio className="w-5 h-5 text-[#F4511E]" />
+                          <FileAudio className="w-5 h-5 text-[#12C8E8]" />
                         ) : (
-                          <Calendar className="w-5 h-5 text-[#F4511E]" />
+                          <Calendar className="w-5 h-5 text-[#12C8E8]" />
                         )}
                       </div>
                       <div>
@@ -341,7 +341,7 @@ export const PrincipalDashboard: React.FC = () => {
 
                     <button
                       onClick={() => approvePendingItem(item.id)}
-                      className="px-5 py-2.5 bg-[#00563F] hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-lg shadow-emerald-950/50 transition flex items-center space-x-2"
+                      className="px-5 py-2.5 bg-[#0A1B45] hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-lg shadow-emerald-950/50 transition flex items-center space-x-2"
                     >
                       <Check className="w-4 h-4" />
                       <span>Approve & Push to Bell Phone</span>
@@ -368,7 +368,7 @@ export const PrincipalDashboard: React.FC = () => {
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
                   Next Scheduled Bell
                 </span>
-                <Clock className="w-4 h-4 text-[#E6AD00]" />
+                <Clock className="w-4 h-4 text-[#54DDF4]" />
               </div>
 
               {upcomingEvent ? (
@@ -377,7 +377,7 @@ export const PrincipalDashboard: React.FC = () => {
                     {upcomingEvent.event_name}
                   </div>
                   <div className="flex items-baseline space-x-2">
-                    <span className="text-3xl font-black font-mono text-[#E6AD00]">
+                    <span className="text-3xl font-black font-mono text-[#54DDF4]">
                       {calculateCountdown()}
                     </span>
                     <span className="text-xs text-slate-400 font-mono">
@@ -452,7 +452,7 @@ export const PrincipalDashboard: React.FC = () => {
                   <span className="text-sm font-medium text-slate-400">Live Events</span>
                 </div>
                 <p className="text-xs text-slate-300">
-                  Active revision #{scheduleRevision}. All armed offline for full fail-safe execution.
+                  Active revision #{scheduleRevision}. Offline playback must be validated on the target device.
                 </p>
                 <div className="flex items-center space-x-2 text-xs">
                   <span className="px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800 font-bold">
@@ -478,7 +478,7 @@ export const PrincipalDashboard: React.FC = () => {
                   Real-time log of what the timetable regulator has edited, uploaded, or drafted.
                 </p>
               </div>
-              <span className="text-xs font-mono text-[#E6AD00] font-bold">
+              <span className="text-xs font-mono text-[#54DDF4] font-bold">
                 Vilac Academic Timetable
               </span>
             </div>
@@ -489,7 +489,7 @@ export const PrincipalDashboard: React.FC = () => {
                   key={log.id}
                   className="p-3 bg-slate-950/60 rounded-xl border border-slate-800/70 flex items-start space-x-3 text-xs"
                 >
-                  <div className="w-2 h-2 rounded-full bg-[#E6AD00] mt-1.5 flex-shrink-0" />
+                  <div className="w-2 h-2 rounded-full bg-[#54DDF4] mt-1.5 flex-shrink-0" />
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-slate-200">

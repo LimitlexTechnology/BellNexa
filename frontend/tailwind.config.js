@@ -8,24 +8,24 @@ export default {
     extend: {
       colors: {
         vilac: {
-          green: '#00563F',
-          darkgreen: '#003D2C',
-          lightgreen: '#E6F2ED',
-          orange: '#F4511E',
-          gold: '#E6AD00',
-          cream: '#FFF9E6',
+          green: '#0A1B45',
+          darkgreen: '#07142F',
+          lightgreen: '#E7F9FC',
+          orange: '#12C8E8',
+          gold: '#54DDF4',
+          cream: '#F1FCFE',
         },
         brand: {
-          primary: 'var(--color-primary, #00563F)',
-          secondary: 'var(--color-secondary, #F4511E)',
-          accent: 'var(--color-accent, #E6AD00)',
+          primary: 'var(--color-primary, #0A1B45)',
+          secondary: 'var(--color-secondary, #12C8E8)',
+          accent: 'var(--color-accent, #54DDF4)',
         }
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
       },
       boxShadow: {
-        'glass': '0 8px 32px 0 rgba(0, 86, 63, 0.1)',
+        'glass': '0 8px 32px 0 rgba(10, 27, 69, 0.24)',
       }
     },
   },

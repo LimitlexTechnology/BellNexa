@@ -13,7 +13,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { useAuth, REGISTERED_ACCOUNTS } from '../context/AuthContext';
-import { VilacEmblem } from '../components/VilacEmblem';
+import { BellNexaLogo } from '../components/BellNexaLogo';
 import { UserRole } from '../types/database';
 
 export const Login: React.FC = () => {
@@ -80,7 +80,7 @@ export const Login: React.FC = () => {
       return;
     }
 
-    const res = completeLogin(email, authCode);
+    const res = completeLogin(email, password, authCode);
     if (!res.success) {
       setErrorMessage(res.error || 'Authentication code failed.');
     }
@@ -89,7 +89,7 @@ export const Login: React.FC = () => {
   // Step 2 for Regulator: Skip optional 2FA
   const handleSkipRegulator2FA = () => {
     setErrorMessage(null);
-    const res = completeLogin(email, '');
+    const res = completeLogin(email, password, '');
     if (!res.success) {
       setErrorMessage(res.error || 'Login could not be completed.');
     }
@@ -138,7 +138,7 @@ export const Login: React.FC = () => {
         {/* ========================================================= */}
         {/* LEFT COLUMN (LAPTOP ONLY: SOLID FOREST GREEN & WATERMARK) */}
         {/* ========================================================= */}
-        <div className="hidden lg:flex flex-col justify-between bg-[#00563F] text-white p-12 relative overflow-hidden select-none">
+        <div className="hidden lg:flex flex-col justify-between bg-[#0A1B45] text-white p-12 relative overflow-hidden select-none">
           {/* Soft Bell Watermark Silhouette */}
           <div className="absolute -bottom-16 -right-16 opacity-10 pointer-events-none">
             <svg 
@@ -149,55 +149,58 @@ export const Login: React.FC = () => {
             </svg>
           </div>
 
-          {/* Top Institutional Crest Header */}
+          {/* BellNexa product identity */}
           <div className="flex items-center space-x-4 z-10">
-            <VilacEmblem size="md" />
+            <BellNexaLogo className="w-16 h-16 rounded-2xl" />
             <div>
-              <h2 className="text-xl font-extrabold tracking-wide text-white uppercase">
-                Vilac International School
+              <h2 className="text-xl font-extrabold tracking-wide text-white">
+                BellNexa
               </h2>
-              <div className="h-[2px] bg-[#E6AD00] w-48 mt-1" />
-              <p className="text-xs text-emerald-100 mt-1 font-medium tracking-wider">
-                Excellence &bull; Leadership &bull; Integrity
+              <div className="h-[2px] bg-[#12C8E8] w-48 mt-1" />
+              <p className="text-xs text-sky-100 mt-1 font-medium tracking-wider">
+                Smart School Bell & Announcement Management
               </p>
             </div>
           </div>
 
           {/* Center Brand Statement */}
           <div className="max-w-md z-10 space-y-4 my-auto py-8">
-            <div className="inline-flex items-center space-x-2 px-3 py-1 bg-emerald-950/40 border border-emerald-700/60 rounded-md text-xs font-semibold text-[#E6AD00]">
-              <ShieldCheck className="w-4 h-4 text-[#E6AD00]" />
+            <div className="inline-flex items-center space-x-2 px-3 py-1 bg-[#102A5C] border border-sky-700/60 rounded-md text-xs font-semibold text-[#54DDF4]">
+              <ShieldCheck className="w-4 h-4 text-[#54DDF4]" />
               <span>Strict Role-Based System Access</span>
             </div>
             
             <h1 className="text-3xl font-extrabold text-white leading-tight">
-              Institutional Bell & Announcement Automation
+              Smart School Bell and Announcement Management
             </h1>
 
-            <p className="text-sm text-emerald-100/90 leading-relaxed font-normal">
-              High-availability schedule distribution and automated bell triggers. All roles authenticate securely through centralized verification.
+            <p className="text-sm text-sky-100/90 leading-relaxed font-normal">
+              BellNexa helps schools automate daily bells, lesson transitions, assemblies, breaks, worship sessions, lunch periods, closing times, and voice announcements. Authorised administrators can manage schedules, audio messages, campuses, and connected devices from one central platform.
+            </p>
+            <p className="text-xs text-sky-200/80 leading-relaxed">
+              Designed for multiple schools and local time zones. Offline playback is intended for compatible devices and must be validated on the target hardware.
             </p>
 
-            <div className="pt-4 border-t border-emerald-700/50 space-y-2 text-xs text-emerald-100/80">
+            <div className="pt-4 border-t border-sky-700/50 space-y-2 text-xs text-sky-100/80">
               <div className="flex items-center space-x-2">
-                <span className="w-2 h-2 rounded-full bg-[#E6AD00]" />
+                <span className="w-2 h-2 rounded-full bg-[#12C8E8]" />
                 <span>Super Admin: Global infrastructure oversight & invites</span>
               </div>
               <div className="flex items-center space-x-2">
-                <span className="w-2 h-2 rounded-full bg-[#E6AD00]" />
+                <span className="w-2 h-2 rounded-full bg-[#12C8E8]" />
                 <span>Principal: Timetable review, approvals & emergency halt</span>
               </div>
               <div className="flex items-center space-x-2">
-                <span className="w-2 h-2 rounded-full bg-[#E6AD00]" />
+                <span className="w-2 h-2 rounded-full bg-[#12C8E8]" />
                 <span>Schedule Regulator: Timetable drafting & audio staging</span>
               </div>
             </div>
           </div>
 
           {/* Left Footer Note */}
-          <div className="z-10 text-xs text-emerald-200/80 font-mono flex items-center justify-between border-t border-emerald-800/80 pt-4">
-            <span>BellNexa Automation Core</span>
-            <span>Accra, Ghana</span>
+          <div className="z-10 text-xs text-sky-200/80 font-mono flex items-center justify-between border-t border-sky-800/80 pt-4">
+            <span>BellNexa</span>
+            <span>School Bell & Announcement Management</span>
           </div>
         </div>
 
@@ -206,14 +209,14 @@ export const Login: React.FC = () => {
         {/* ========================================================= */}
         <div className="flex flex-col justify-between bg-slate-50 lg:bg-white min-h-screen">
           
-          {/* PHONE ONLY: FOREST-GREEN HEADER WITH VILAC EMBLEM */}
-          <header className="lg:hidden bg-[#00563F] text-white p-6 text-center select-none shadow-md">
+          {/* PHONE ONLY: BELLNEXA BRAND HEADER */}
+          <header className="lg:hidden bg-[#0A1B45] text-white p-6 text-center select-none shadow-md">
             <div className="flex flex-col items-center justify-center space-y-2">
-              <VilacEmblem size="lg" className="mx-auto" />
-              <h1 className="text-xl font-bold tracking-tight text-white uppercase mt-1">
-                Vilac International School
+              <BellNexaLogo className="w-24 h-24 rounded-3xl mx-auto" />
+              <h1 className="text-xl font-bold tracking-tight text-white mt-1">
+                BellNexa
               </h1>
-              <div className="h-[2px] bg-[#E6AD00] w-36 mx-auto mt-0.5" />
+              <div className="h-[2px] bg-[#12C8E8] w-36 mx-auto mt-0.5" />
             </div>
           </header>
 
@@ -222,14 +225,12 @@ export const Login: React.FC = () => {
             
             {/* Product Identity */}
             <div className="text-center mb-6 w-full">
-              <div className="inline-flex items-center justify-center p-2 rounded-lg bg-orange-100 text-[#F4511E] mb-2">
-                <Bell className="w-5 h-5 text-[#F4511E]" />
-              </div>
+              <BellNexaLogo className="w-12 h-12 rounded-xl mx-auto mb-2" />
               <h2 className="text-2xl font-black text-slate-900 tracking-tight">
                 BellNexa
               </h2>
               <p className="text-xs font-medium text-slate-600 mt-0.5">
-                School Bell & Announcement Automation
+                Smart School Bell and Announcement Management
               </p>
             </div>
 
@@ -267,7 +268,7 @@ export const Login: React.FC = () => {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="e.g. principal@vilac.edu.gh"
-                        className="w-full pl-11 pr-4 py-3.5 bg-white border-2 border-slate-300 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#00563F] focus:ring-1 focus:ring-[#00563F] transition min-h-[48px]"
+                        className="w-full pl-11 pr-4 py-3.5 bg-white border-2 border-slate-300 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#12C8E8] focus:ring-1 focus:ring-[#12C8E8] transition min-h-[48px]"
                       />
                     </div>
                   </div>
@@ -284,7 +285,7 @@ export const Login: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setIsForgotPasswordOpen(true)}
-                        className="text-xs font-bold text-[#00563F] hover:underline"
+                        className="text-xs font-bold text-[#0A1B45] hover:text-[#087F9B] hover:underline"
                       >
                         Forgot password?
                       </button>
@@ -300,7 +301,7 @@ export const Login: React.FC = () => {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••••••"
-                        className="w-full pl-11 pr-12 py-3.5 bg-white border-2 border-slate-300 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#00563F] focus:ring-1 focus:ring-[#00563F] transition min-h-[48px]"
+                        className="w-full pl-11 pr-12 py-3.5 bg-white border-2 border-slate-300 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#12C8E8] focus:ring-1 focus:ring-[#12C8E8] transition min-h-[48px]"
                       />
                       <button
                         type="button"
@@ -317,10 +318,10 @@ export const Login: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Large Orange Sign in Button */}
+                  {/* Primary sign-in action */}
                   <button
                     type="submit"
-                    className="w-full bg-[#F4511E] hover:bg-[#D84315] active:bg-[#BF360C] text-white font-extrabold py-3.5 px-6 rounded-xl text-base shadow-sm hover:shadow transition duration-150 min-h-[50px] flex items-center justify-center"
+                    className="w-full bg-[#0A1B45] hover:bg-[#102A5C] active:bg-[#07142F] text-white font-extrabold py-3.5 px-6 rounded-xl text-base shadow-sm hover:shadow transition duration-150 min-h-[50px] flex items-center justify-center"
                   >
                     Sign in
                   </button>
@@ -380,7 +381,7 @@ export const Login: React.FC = () => {
                         value={authCode}
                         onChange={(e) => setAuthCode(e.target.value.replace(/\D/g, ''))}
                         placeholder="123456"
-                        className="w-full text-center tracking-[0.5em] text-2xl font-mono font-extrabold py-3 bg-white border-2 border-slate-300 rounded-xl text-slate-900 placeholder-slate-300 focus:outline-none focus:border-[#00563F] focus:ring-1 focus:ring-[#00563F] transition min-h-[48px]"
+                        className="w-full text-center tracking-[0.5em] text-2xl font-mono font-extrabold py-3 bg-white border-2 border-slate-300 rounded-xl text-slate-900 placeholder-slate-300 focus:outline-none focus:border-[#12C8E8] focus:ring-1 focus:ring-[#12C8E8] transition min-h-[48px]"
                       />
                       <div className="flex items-center justify-between mt-2">
                         <span className="text-[11px] text-slate-500">
@@ -389,7 +390,7 @@ export const Login: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setAuthCode('123456')}
-                          className="text-[11px] font-bold text-[#00563F] hover:underline"
+                          className="text-[11px] font-bold text-[#0A1B45] hover:text-[#087F9B] hover:underline"
                         >
                           Auto-fill Demo Code
                         </button>
@@ -399,7 +400,7 @@ export const Login: React.FC = () => {
                     <div className="space-y-2 pt-2">
                       <button
                         type="submit"
-                        className="w-full bg-[#F4511E] hover:bg-[#D84315] active:bg-[#BF360C] text-white font-extrabold py-3.5 px-6 rounded-xl text-sm shadow-sm transition min-h-[48px] flex items-center justify-center"
+                        className="w-full bg-[#0A1B45] hover:bg-[#102A5C] active:bg-[#07142F] text-white font-extrabold py-3.5 px-6 rounded-xl text-sm shadow-sm transition min-h-[48px] flex items-center justify-center"
                       >
                         Verify & Sign in
                       </button>
@@ -428,7 +429,7 @@ export const Login: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsInviteModalOpen(true)}
-                  className="font-extrabold text-[#00563F] hover:underline"
+                  className="font-extrabold text-[#0A1B45] hover:text-[#087F9B] hover:underline"
                 >
                   Activate your account
                 </button>
@@ -452,14 +453,14 @@ export const Login: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => fillCredentials('principal@vilac.edu.gh')}
-                  className="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-[11px] font-bold text-[#00563F] transition"
+                  className="px-2.5 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 border border-sky-300 text-[11px] font-bold text-[#0A1B45] transition"
                 >
                   Principal
                 </button>
                 <button
                   type="button"
                   onClick={() => fillCredentials('regulator@vilac.edu.gh')}
-                  className="px-2.5 py-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 border border-orange-300 text-[11px] font-bold text-[#F4511E] transition"
+                  className="px-2.5 py-1.5 rounded-lg bg-cyan-50 hover:bg-cyan-100 border border-cyan-300 text-[11px] font-bold text-[#087F9B] transition"
                 >
                   Schedule Regulator
                 </button>
@@ -484,7 +485,7 @@ export const Login: React.FC = () => {
           <div className="bg-white rounded-2xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-300 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center space-x-2">
-                <Key className="w-5 h-5 text-[#00563F]" />
+                <Key className="w-5 h-5 text-[#087F9B]" />
                 <h3 className="text-base font-bold text-slate-900">Activate Account</h3>
               </div>
               <button
@@ -521,13 +522,13 @@ export const Login: React.FC = () => {
                   placeholder="e.g. INV-VILAC-PRIN-88219"
                   value={inviteToken}
                   onChange={(e) => setInviteToken(e.target.value)}
-                  className="w-full px-3.5 py-2.5 font-mono text-xs font-semibold bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-[#00563F]"
+                  className="w-full px-3.5 py-2.5 font-mono text-xs font-semibold bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-[#12C8E8]"
                 />
                 <div className="flex gap-2 mt-1">
                   <button
                     type="button"
                     onClick={() => setInviteToken('INV-VILAC-PRIN-88219')}
-                    className="text-[10px] text-[#00563F] hover:underline"
+                    className="text-[10px] text-[#0A1B45] hover:text-[#087F9B] hover:underline"
                   >
                     Use Sample Principal Token
                   </button>
@@ -535,7 +536,7 @@ export const Login: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setInviteToken('INV-VILAC-REG-99412')}
-                    className="text-[10px] text-[#00563F] hover:underline"
+                    className="text-[10px] text-[#0A1B45] hover:text-[#087F9B] hover:underline"
                   >
                     Use Sample Regulator Token
                   </button>
@@ -552,7 +553,7 @@ export const Login: React.FC = () => {
                   placeholder="e.g. Dr. Kwesi Mensah"
                   value={inviteFullName}
                   onChange={(e) => setInviteFullName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs font-semibold bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-[#00563F]"
+                  className="w-full px-3.5 py-2.5 text-xs font-semibold bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-[#12C8E8]"
                 />
               </div>
 
@@ -566,7 +567,7 @@ export const Login: React.FC = () => {
                   placeholder="At least 6 characters"
                   value={invitePassword}
                   onChange={(e) => setInvitePassword(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs font-semibold bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-[#00563F]"
+                  className="w-full px-3.5 py-2.5 text-xs font-semibold bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-[#12C8E8]"
                 />
               </div>
 
@@ -580,7 +581,7 @@ export const Login: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 px-4 text-xs font-bold text-white bg-[#00563F] hover:bg-emerald-900 rounded-xl transition"
+                  className="flex-1 py-2.5 px-4 text-xs font-bold text-white bg-[#0A1B45] hover:bg-[#102A5C] rounded-xl transition"
                 >
                   Activate & Sign In
                 </button>
@@ -596,8 +597,8 @@ export const Login: React.FC = () => {
       {isForgotPasswordOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-300 space-y-4">
-            <div className="flex items-center space-x-2 text-[#00563F]">
-              <HelpCircle className="w-5 h-5 text-[#00563F]" />
+            <div className="flex items-center space-x-2 text-[#0A1B45]">
+              <HelpCircle className="w-5 h-5 text-[#12C8E8]" />
               <h3 className="text-base font-bold text-slate-900">Institutional Password Reset</h3>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed">
@@ -605,13 +606,13 @@ export const Login: React.FC = () => {
             </p>
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 space-y-1">
               <p className="font-bold text-slate-900">Contact Super Administrator:</p>
-              <p className="font-mono text-emerald-800">founder@bellnexa.com</p>
+              <p className="font-mono text-[#0A1B45]">founder@bellnexa.com</p>
               <p className="text-[11px] text-slate-500">Or contact your school IT office in Accra.</p>
             </div>
             <button
               type="button"
               onClick={() => setIsForgotPasswordOpen(false)}
-              className="w-full py-2.5 px-4 text-xs font-bold text-white bg-[#00563F] hover:bg-emerald-900 rounded-xl transition"
+              className="w-full py-2.5 px-4 text-xs font-bold text-white bg-[#0A1B45] hover:bg-[#102A5C] rounded-xl transition"
             >
               Understood
             </button>

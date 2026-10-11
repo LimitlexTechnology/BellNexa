@@ -7,6 +7,7 @@ import { SuperAdminDashboard } from './pages/SuperAdminDashboard';
 import { PrincipalDashboard } from './pages/PrincipalDashboard';
 import { RegulatorDashboard } from './pages/RegulatorDashboard';
 import { BellPhoneScreen } from './pages/BellPhoneScreen';
+import { InstallPrompt } from './components/InstallPrompt';
 
 const MainAppContent: React.FC = () => {
   const { isAuthenticated, role, isBellPhoneMode } = useAuth();
@@ -41,6 +42,7 @@ export const App: React.FC = () => {
     <AuthProvider>
       <BellStateProvider>
         <MainAppContent />
+        <InstallPrompt />
       </BellStateProvider>
     </AuthProvider>
   );

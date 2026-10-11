@@ -62,14 +62,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
         })}
       </div>
 
-      {/* Pilot School Badge */}
+      {/* Current school workspace */}
       <div className="p-3 rounded-xl bg-gradient-to-b from-slate-800/80 to-slate-900 border border-slate-800 text-xs">
         <div className="flex items-center space-x-2 text-vilac-gold font-semibold mb-1">
           <Building2 className="w-3.5 h-3.5" />
-          <span>Vilac Pilot Active</span>
+          <span>Vilac International School</span>
         </div>
         <p className="text-[11px] text-slate-400 leading-relaxed">
-          Local bell engine operational on dedicated school hardware in Accra, Ghana.
+          Current pilot school workspace in Accra, Ghana.
         </p>
       </div>
     </aside>

@@ -1,10 +1,12 @@
 # BellNexa System Architecture Blueprint & Operational Specification
 
 ## 1. System Vision
-BellNexa is a multi-tenant, offline-first school bell and scheduled announcement platform.
-It is built on a dual-component model:
+BellNexa is designed as a multi-school bell scheduling and announcement platform.
+Its intended delivery model has two components:
 1. **Web Administration Dashboard**: Centralized management for Super Administrators (founder) and School Administrators (e.g., Vilac International School).
-2. **Native Android Bell Engine**: Local playback application running on dedicated school Android hardware, utilizing `AlarmManager` exact alarms, `Room` SQLite DB, and Media3 audio rendering.
+2. **Native Android Bell Engine (planned)**: A dedicated school device app may use `AlarmManager` exact alarms, a local schedule database, and Media3 audio rendering.
+
+The repository currently contains the React/Vite web app only. Its schedule and authentication data are demo state; there is no Android app or automatic scheduled-playback engine in this repository.
 
 ---
 
@@ -16,8 +18,8 @@ It is built on a dual-component model:
 
 ---
 
-## 3. Offline-First Bell Playback Guarantee
-- The Android application caches all approved schedule events and audio assets in a local Room database.
-- Bell ringing and voice announcements are triggered via `AlarmManager.setAlarmClock()` / `setExactAndAllowWhileIdle()`.
-- Alarms fire without network connectivity, when the screen is locked, or when the app is backgrounded.
-- Reboot recovery is automatically handled by an Android `RECEIVE_BOOT_COMPLETED` BroadcastReceiver.
+## 3. Offline and Background Playback
+- The web app's service worker caches the production app shell and static assets for offline loading after an initial successful visit.
+- The web app does not currently persist approved schedules/audio for offline playback and does not run an automatic schedule trigger. Browser audio and background execution are best-effort and vary by operating system, browser, power settings, and user interaction.
+- A dedicated Android app is planned for supported school hardware. It must be implemented and tested with approved schedule sync, local storage, exact-alarm permissions, audio playback, and reboot recovery before offline/background playback can be claimed.
+- No solution can guarantee browser-based audio playback on every device, particularly when the operating system suspends or terminates the page.

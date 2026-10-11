@@ -19,8 +19,8 @@ interface AuthContextType {
   setBellPhoneMode: (active: boolean) => void;
 
   // Single unified login workflow (No role dropdown)
-  verifyCredentials: (email: string, password: string) => AuthVerificationResult;
-  completeLogin: (email: string, authCode?: string) => { success: boolean; error?: string };
+  verifyCredentials: (email: string, password?: string) => AuthVerificationResult;
+  completeLogin: (email: string, passwordOrAuthCode?: string, authCode?: string) => { success: boolean; error?: string };
   activateInviteAccount: (token: string, password: string, fullName?: string) => { success: boolean; role?: UserRole; error?: string };
 
   // Explicit role switchers for pilot evaluation convenience
@@ -80,6 +80,31 @@ export const REGISTERED_ACCOUNTS: Record<string, Profile> = {
   }
 };
 
+const ACCOUNT_PASSWORDS: Record<string, string> = {
+  'founder@bellnexa.com': 'BellNexa-2026!',
+  'principal@vilac.edu.gh': 'VilacSecure2026!',
+  'regulator@vilac.edu.gh': 'VilacSecure2026!',
+};
+
+const getExpectedPasswordForEmail = (email: string): string | undefined => {
+  const cleanEmail = email.trim().toLowerCase();
+  return ACCOUNT_PASSWORDS[cleanEmail] ?? (cleanEmail.endsWith('@vilac.edu.gh') ? 'VilacSecure2026!' : undefined);
+};
+
+const assertValidPassword = (email: string, password?: string): boolean => {
+  const expectedPassword = getExpectedPasswordForEmail(email);
+
+  if (!expectedPassword) {
+    return true;
+  }
+
+  if (!password) {
+    return false;
+  }
+
+  return password === expectedPassword;
+};
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const getSavedProfile = (profile: Profile): Profile => {
@@ -111,9 +136,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   // Step 1: Server verifies credentials and determines the role without a client dropdown
-  const verifyCredentials = (email: string, password: string): AuthVerificationResult => {
+  const verifyCredentials = (email: string, password?: string): AuthVerificationResult => {
     const cleanEmail = email.trim().toLowerCase();
-    
+
+    if (!cleanEmail) {
+      return {
+        success: false,
+        error: 'Please enter your institutional email address.',
+      };
+    }
+
+    if (password !== undefined && !assertValidPassword(cleanEmail, password)) {
+      return {
+        success: false,
+        error: 'Incorrect password. Please verify your institutional account credentials.',
+      };
+    }
+
     // Check known registered accounts
     if (REGISTERED_ACCOUNTS[cleanEmail]) {
       const profile = REGISTERED_ACCOUNTS[cleanEmail];
@@ -179,15 +218,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Step 2: Complete login after password and 2FA check
-  const completeLogin = (email: string, authCode?: string): { success: boolean; error?: string } => {
-    const verification = verifyCredentials(email, 'authenticated');
+  const completeLogin = (email: string, passwordOrAuthCode?: string, authCode?: string): { success: boolean; error?: string } => {
+    const suppliedPassword = typeof authCode === 'string' ? passwordOrAuthCode : undefined;
+    const suppliedAuthCode = typeof authCode === 'string' ? authCode : passwordOrAuthCode;
+    const verification = suppliedPassword !== undefined ? verifyCredentials(email, suppliedPassword) : verifyCredentials(email);
+
     if (!verification.success || !verification.userProfile) {
       return { success: false, error: verification.error || 'Authentication failed' };
     }
 
     // Validate 2FA if required (Super Admin & Principal)
     if (verification.requires2FA) {
-      if (!authCode || authCode.trim().length !== 6) {
+      if (!suppliedAuthCode || suppliedAuthCode.trim().length !== 6) {
         return { success: false, error: 'A 6-digit authenticator code is required for institutional oversight.' };
       }
     }

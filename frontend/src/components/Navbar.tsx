@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { 
-  Bell, 
   Shield, 
   School, 
   LogOut, 
@@ -15,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useBellState } from '../context/BellStateContext';
+import { BellNexaLogo } from './BellNexaLogo';
 import { VilacEmblem } from './VilacEmblem';
 
 export const Navbar: React.FC = () => {
@@ -48,18 +48,16 @@ export const Navbar: React.FC = () => {
     <header className="h-16 border-b border-slate-800 bg-slate-900/95 backdrop-blur sticky top-0 z-50 px-4 lg:px-8 flex items-center justify-between font-sans">
       {/* Brand & Emblem */}
       <div className="flex items-center space-x-3">
-        <div className="w-10 h-10 rounded-xl bg-[#00563F] flex items-center justify-center border border-emerald-700/60 shadow-md">
-          <Bell className="w-5 h-5 text-white" />
-        </div>
+        <BellNexaLogo className="w-10 h-10 rounded-xl shadow-md" />
         <div>
           <div className="flex items-center space-x-2">
             <span className="font-black text-lg text-white tracking-tight">BellNexa</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-[#F4511E]/20 text-[#F4511E] border border-[#F4511E]/30">
+            <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-cyan-400/10 text-[#54DDF4] border border-cyan-300/30">
               PILOT v1.0
             </span>
           </div>
           <p className="text-[11px] text-slate-400 font-medium hidden sm:block">
-            School Bell & Announcement Automation
+            Smart School Bell and Announcement Management
           </p>
         </div>
       </div>
@@ -71,7 +69,7 @@ export const Navbar: React.FC = () => {
           <div className="text-xs">
             <span className="text-slate-400 font-medium">Tenant: </span>
             <span className="font-bold text-white">{currentSchool.name}</span>
-            <span className="ml-1.5 text-[10px] text-[#E6AD00] font-mono">({currentSchool.code})</span>
+            <span className="ml-1.5 text-[10px] text-[#54DDF4] font-mono">({currentSchool.code})</span>
           </div>
           <span className="flex h-2 w-2 relative ml-1">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -86,7 +84,7 @@ export const Navbar: React.FC = () => {
         {/* Button to open the dedicated School Bell Phone Kiosk screen */}
         <button
           onClick={() => setBellPhoneMode(true)}
-          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-emerald-950/80 text-emerald-400 hover:text-emerald-300 border border-slate-700 hover:border-emerald-600 text-xs font-bold transition shadow-sm"
+          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-[#102A5C] text-cyan-300 hover:text-cyan-200 border border-slate-700 hover:border-cyan-500 text-xs font-bold transition shadow-sm"
           title="Open dedicated unattended School Bell Phone screen"
         >
           <Smartphone className="w-4 h-4" />
@@ -109,12 +107,12 @@ export const Navbar: React.FC = () => {
             </div>
             <div className="text-[10px] font-mono flex items-center justify-end space-x-1 mt-0.5">
               {role === 'super_admin' && (
-                <span className="text-[#F4511E] font-bold flex items-center">
+                <span className="text-cyan-300 font-bold flex items-center">
                   <Shield className="w-3 h-3 mr-0.5 inline" /> Super Admin
                 </span>
               )}
               {role === 'principal' && (
-                <span className="text-[#E6AD00] font-bold flex items-center">
+                <span className="text-sky-300 font-bold flex items-center">
                   <School className="w-3 h-3 mr-0.5 inline" /> Principal (Oversight)
                 </span>
               )}
@@ -126,7 +124,7 @@ export const Navbar: React.FC = () => {
             </div>
           </div>
 
-          <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300">
+          <div className="w-8 h-8 rounded-full bg-[#102A5C] border border-sky-700/60 flex items-center justify-center text-cyan-200">
             <User className="w-4 h-4" />
           </div>
 
@@ -154,7 +152,7 @@ export const Navbar: React.FC = () => {
             <div className="space-y-3">
               <div>
                 <label htmlFor="profile-name" className="block text-xs font-bold text-slate-300 mb-1">Full name</label>
-                <input id="profile-name" required value={fullName} onChange={event => setFullName(event.target.value)} className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-emerald-500" />
+                <input id="profile-name" required value={fullName} onChange={event => setFullName(event.target.value)} className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-400" />
               </div>
               <div>
                 <label htmlFor="profile-email" className="block text-xs font-bold text-slate-300 mb-1">Email</label>
@@ -162,19 +160,19 @@ export const Navbar: React.FC = () => {
               </div>
               <div>
                 <label htmlFor="profile-phone" className="block text-xs font-bold text-slate-300 mb-1">Phone</label>
-                <input id="profile-phone" type="tel" value={phone} onChange={event => setPhone(event.target.value)} className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-emerald-500" />
+                <input id="profile-phone" type="tel" value={phone} onChange={event => setPhone(event.target.value)} className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-400" />
               </div>
             </div>
 
             <div className="border-t border-slate-800 pt-4 space-y-3">
               <label htmlFor="speech-voice" className="flex items-center gap-2 text-xs font-bold text-slate-300">
-                <Volume2 className="w-4 h-4 text-emerald-400" /> Announcement voice
+                <Volume2 className="w-4 h-4 text-cyan-300" /> Announcement voice
               </label>
               <select
                 id="speech-voice"
                 value={availableVoices.some(voice => voice.voiceURI === selectedVoiceURI) ? selectedVoiceURI : ''}
                 onChange={event => setSpeechVoice(event.target.value)}
-                className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-emerald-500"
+                className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-400"
               >
                 <option value="">Automatic (Ghanaian English, then British English)</option>
                 {availableVoices.map(voice => (

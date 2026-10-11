@@ -214,7 +214,7 @@ export const BellPhoneScreen: React.FC = () => {
             <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
               {nextBell?.event_name || 'No Upcoming Events'}
             </h2>
-            <div className="text-xs font-mono text-[#E6AD00] font-bold">
+            <div className="text-xs font-mono text-[#54DDF4] font-bold">
               Scheduled at {nextBell?.start_time || '--:--'} GMT &bull; Repeats {nextBell?.repeat_count || 3}x
             </div>
           </div>

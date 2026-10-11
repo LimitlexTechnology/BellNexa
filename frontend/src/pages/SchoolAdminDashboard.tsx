@@ -335,7 +335,7 @@ export const SchoolAdminDashboard: React.FC = () => {
           </div>
           <button
             onClick={() => handleTestAudio('Emergency Bell Alert', 'Emergency announcement. All teachers and students please remain calm and follow safety protocols.', 3)}
-            className="w-full bg-vilac-orange hover:bg-orange-600 text-white font-bold py-2 rounded-lg text-xs flex items-center justify-center space-x-1.5 shadow-lg shadow-vilac-orange/30 transition"
+            className="w-full bg-vilac-orange hover:bg-cyan-600 text-white font-bold py-2 rounded-lg text-xs flex items-center justify-center space-x-1.5 shadow-lg shadow-vilac-orange/30 transition"
           >
             <Volume2 className="w-4 h-4" />
             <span>Trigger Emergency Announcement (3x)</span>

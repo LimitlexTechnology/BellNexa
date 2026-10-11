@@ -180,7 +180,7 @@ export const RegulatorDashboard: React.FC = () => {
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
         <div>
           <div className="flex items-center space-x-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#F4511E] bg-orange-950/40 border border-orange-800/60 px-2 py-0.5 rounded">
+            <span className="text-xs font-bold uppercase tracking-wider text-[#12C8E8] bg-cyan-950/40 border border-cyan-800/60 px-2 py-0.5 rounded">
               Schedule Regulator Workspace
             </span>
             <span className="text-xs text-slate-400 font-mono">
@@ -207,7 +207,7 @@ export const RegulatorDashboard: React.FC = () => {
 
           <button
             onClick={handleOpenAddModal}
-            className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-5 py-2.5 rounded-xl text-xs font-black bg-[#F4511E] hover:bg-[#D84315] text-white shadow-lg shadow-orange-950/50 transition"
+            className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-5 py-2.5 rounded-xl text-xs font-black bg-[#12C8E8] hover:bg-[#087F9B] text-white shadow-lg shadow-cyan-950/50 transition"
           >
             <Plus className="w-4 h-4" />
             <span>Add Event</span>
@@ -268,7 +268,7 @@ export const RegulatorDashboard: React.FC = () => {
                   onClick={() => setSelectedDay(day.id)}
                   className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 ${
                     isSelected
-                      ? 'bg-[#00563F] text-white shadow-sm'
+                      ? 'bg-[#0A1B45] text-white shadow-sm'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800'
                   }`}
                 >
@@ -370,7 +370,7 @@ export const RegulatorDashboard: React.FC = () => {
                   {ev.approval_status === 'draft' && (
                     <button
                       onClick={() => submitEventForApproval(ev.id)}
-                      className="px-3 py-1.5 bg-[#00563F] hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center space-x-1.5 transition"
+                      className="px-3 py-1.5 bg-[#0A1B45] hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center space-x-1.5 transition"
                     >
                       <Send className="w-3.5 h-3.5" />
                       <span>Submit for Approval</span>
@@ -407,7 +407,7 @@ export const RegulatorDashboard: React.FC = () => {
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center space-x-3">
-            <div className="p-2 bg-orange-500/10 rounded-xl text-[#F4511E]">
+            <div className="p-2 bg-cyan-500/10 rounded-xl text-[#12C8E8]">
               <Headphones className="w-5 h-5" />
             </div>
             <div>
@@ -437,7 +437,7 @@ export const RegulatorDashboard: React.FC = () => {
               value={audioTitle}
               onChange={(e) => setAudioTitle(e.target.value)}
               placeholder="e.g. End of Term Devotional Chime"
-              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#F4511E]"
+              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#12C8E8]"
             />
           </div>
 
@@ -451,7 +451,7 @@ export const RegulatorDashboard: React.FC = () => {
               max={180}
               value={audioDuration}
               onChange={(e) => setAudioDuration(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-[#F4511E]"
+              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-[#12C8E8]"
             />
           </div>
 
@@ -467,7 +467,7 @@ export const RegulatorDashboard: React.FC = () => {
 
             <button
               type="submit"
-              className="flex-1 px-4 py-2.5 bg-[#F4511E] hover:bg-[#D84315] text-white rounded-xl text-xs font-black shadow-md transition flex items-center justify-center space-x-1.5"
+              className="flex-1 px-4 py-2.5 bg-[#12C8E8] hover:bg-[#087F9B] text-white rounded-xl text-xs font-black shadow-md transition flex items-center justify-center space-x-1.5"
             >
               <Upload className="w-4 h-4" />
               <span>Stage & Submit Audio</span>
@@ -505,7 +505,7 @@ export const RegulatorDashboard: React.FC = () => {
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="e.g. Science Laboratory Transition"
-                  className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#F4511E]"
+                  className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#12C8E8]"
                 />
               </div>
 
@@ -517,7 +517,7 @@ export const RegulatorDashboard: React.FC = () => {
                   <select
                     value={formCategory}
                     onChange={(e) => setFormCategory(e.target.value as EventCategory)}
-                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#F4511E]"
+                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#12C8E8]"
                   >
                     <option value="morning_assembly">Morning Assembly</option>
                     <option value="lesson_commencement">Lesson Commencement</option>
@@ -539,7 +539,7 @@ export const RegulatorDashboard: React.FC = () => {
                     required
                     value={formTime}
                     onChange={(e) => setFormTime(e.target.value)}
-                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:outline-none focus:border-[#F4511E]"
+                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:outline-none focus:border-[#12C8E8]"
                   />
                 </div>
               </div>
@@ -565,7 +565,7 @@ export const RegulatorDashboard: React.FC = () => {
                         }}
                         className={`px-3 py-1.5 rounded-lg font-bold transition ${
                           active
-                            ? 'bg-[#00563F] text-white'
+                            ? 'bg-[#0A1B45] text-white'
                             : 'bg-slate-950 text-slate-400 border border-slate-800'
                         }`}
                       >
@@ -586,7 +586,7 @@ export const RegulatorDashboard: React.FC = () => {
                   value={formAnnouncement}
                   onChange={(e) => setFormAnnouncement(e.target.value)}
                   placeholder="e.g. Please proceed to the assembly courtyard in orderly fashion..."
-                  className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#F4511E]"
+                  className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#12C8E8]"
                 />
               </div>
 
@@ -599,7 +599,7 @@ export const RegulatorDashboard: React.FC = () => {
                   <select
                     value={formRepeatCount}
                     onChange={(e) => setFormRepeatCount(Number(e.target.value))}
-                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#F4511E]"
+                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-[#12C8E8]"
                   >
                     <option value={1}>1x (Once)</option>
                     <option value={2}>2x (Twice)</option>
@@ -617,7 +617,7 @@ export const RegulatorDashboard: React.FC = () => {
                     max={100}
                     value={formVolume}
                     onChange={(e) => setFormVolume(Number(e.target.value))}
-                    className="w-full mt-2 accent-[#F4511E]"
+                    className="w-full mt-2 accent-[#12C8E8]"
                   />
                 </div>
               </div>
@@ -644,7 +644,7 @@ export const RegulatorDashboard: React.FC = () => {
               <button
                 type="button"
                 onClick={() => handleSaveEvent(true)}
-                className="px-5 py-2.5 bg-[#00563F] hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition"
+                className="px-5 py-2.5 bg-[#0A1B45] hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition"
               >
                 Save & Submit for Principal
               </button>
