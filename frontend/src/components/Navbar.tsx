@@ -5,9 +5,7 @@ import {
   LogOut, 
   User, 
   Smartphone, 
-  Clock, 
   CalendarClock,
-  Sparkles,
   Settings,
   X,
   Volume2
@@ -30,6 +28,8 @@ export const Navbar: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   const openSettings = () => {
     setFullName(user?.full_name || '');
@@ -37,11 +37,27 @@ export const Navbar: React.FC = () => {
     setIsSettingsOpen(true);
   };
 
-  const saveProfile = (event: React.FormEvent) => {
+  const saveProfile = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!fullName.trim()) return;
-    updateProfile({ full_name: fullName, phone });
-    setIsSettingsOpen(false);
+    setProfileError(null);
+    setIsSavingProfile(true);
+    try {
+      await updateProfile({ full_name: fullName, phone });
+      setIsSettingsOpen(false);
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : 'Unable to save your profile.');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Unable to sign out.');
+    }
   };
 
   return (
@@ -130,7 +146,7 @@ export const Navbar: React.FC = () => {
 
           {/* Sign Out Button */}
           <button
-            onClick={logout}
+            onClick={() => void handleLogout()}
             title="Sign Out to Login Screen"
             className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition"
           >
@@ -150,6 +166,9 @@ export const Navbar: React.FC = () => {
             </div>
 
             <div className="space-y-3">
+              {profileError && (
+                <p role="alert" className="text-xs text-rose-300">{profileError}</p>
+              )}
               <div>
                 <label htmlFor="profile-name" className="block text-xs font-bold text-slate-300 mb-1">Full name</label>
                 <input id="profile-name" required value={fullName} onChange={event => setFullName(event.target.value)} className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-400" />
@@ -187,7 +206,9 @@ export const Navbar: React.FC = () => {
 
             <div className="flex justify-end gap-2 border-t border-slate-800 pt-3">
               <button type="button" onClick={() => setIsSettingsOpen(false)} className="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-300">Cancel</button>
-              <button type="submit" className="px-3 py-2 bg-[#0A1B45] hover:bg-[#102A5C] rounded-lg text-xs font-bold text-white">Save profile</button>
+              <button type="submit" disabled={isSavingProfile} className="px-3 py-2 bg-[#0A1B45] hover:bg-[#102A5C] rounded-lg text-xs font-bold text-white disabled:opacity-60">
+                {isSavingProfile ? 'Saving…' : 'Save profile'}
+              </button>
             </div>
           </form>
         </div>

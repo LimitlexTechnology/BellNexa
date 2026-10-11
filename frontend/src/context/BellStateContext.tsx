@@ -353,7 +353,7 @@ const INITIAL_INVITATIONS: Invitation[] = [
     token: 'INV-VILAC-PRIN-88219',
     expires_at: '2026-10-24',
     is_used: true,
-    invited_by: 'founder@bellnexa.com',
+    invited_by: 'Demo data (not an authenticated user)',
     created_at: new Date(Date.now() - 86400000 * 3).toISOString(),
   },
   {
@@ -365,7 +365,7 @@ const INITIAL_INVITATIONS: Invitation[] = [
     token: 'INV-VILAC-REG-99412',
     expires_at: '2026-10-24',
     is_used: true,
-    invited_by: 'founder@bellnexa.com',
+    invited_by: 'Demo data (not an authenticated user)',
     created_at: new Date(Date.now() - 86400000 * 3).toISOString(),
   }
 ];
