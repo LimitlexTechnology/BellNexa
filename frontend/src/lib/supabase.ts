@@ -42,7 +42,7 @@ export const isSupabaseConfigured = (): boolean => {
                           anonKey.startsWith('eyJ') || 
                           anonKey.startsWith('sb_secret_');
 
-  return Boolean(
+  const isConfigured = Boolean(
     url &&
     anonKey &&
     url.length > 20 &&
@@ -54,4 +54,17 @@ export const isSupabaseConfigured = (): boolean => {
     !url.includes('example.com') &&
     !anonKey.includes('placeholder')
   );
+
+  if (!isConfigured) {
+    console.error('[Supabase] Configuration validation failed:', {
+      hasUrl: !!url,
+      hasKey: !!anonKey,
+      urlLength: url?.length || 0,
+      keyLength: anonKey?.length || 0,
+      validKeyFormat: isValidKeyFormat,
+      urlPattern: url ? /^https:\/\/.+\.supabase\.co$/.test(url) : false,
+    });
+  }
+
+  return isConfigured;
 };

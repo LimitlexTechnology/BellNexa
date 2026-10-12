@@ -305,14 +305,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     void supabase.auth.getSession().then(async ({ data, error }) => {
       if (!active) return;
       if (error) {
+        console.error('[Auth] Session restore failed:', error.message);
         setAuthError(error.message);
         setIsLoading(false);
         return;
       }
       if (data.session && !passwordRecoveryRef.current) {
+        console.log('[Auth] Restoring session from storage');
         try {
           await loadSession(data.session);
+          console.log('[Auth] Session restored successfully');
         } catch (restoreError) {
+          console.error('[Auth] Session restore error:', restoreError);
           let signOutMessage = '';
           try {
             const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' });
@@ -330,6 +334,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (active) setIsLoading(false);
     }).catch((sessionError: unknown) => {
       if (!active) return;
+      console.error('[Auth] Failed to check saved session:', sessionError);
       setAuthError(sessionError instanceof Error ? sessionError.message : 'Unable to check the saved Supabase session.');
       setIsLoading(false);
     });
@@ -449,6 +454,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (email: string, password: string): Promise<LoginResult> => {
     if (!isSupabaseConfigured()) {
+      console.error('[Auth] Sign-in failed: Supabase is not configured');
       return { success: false, error: 'Supabase is not configured. Set the public project URL and anon key before signing in.' };
     }
     setIsLoading(true);
@@ -464,6 +470,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password,
       });
       if (error) {
+        console.error('[Auth] Sign-in failed:', { code: error.code, message: error.message, email: email.trim().toLowerCase() });
         if (error.code === 'email_not_confirmed') {
           return { success: false, error: 'Confirm your email using the link we sent before signing in.' };
         }
@@ -472,25 +479,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         return { success: false, error: error.message };
       }
-      if (!data.session) return { success: false, error: 'Supabase did not create an authenticated session.' };
+      if (!data.session) {
+        console.error('[Auth] Sign-in failed: No session created by Supabase');
+        return { success: false, error: 'Supabase did not create an authenticated session.' };
+      }
 
       const account = await getPendingAccount(data.session);
+      console.log('[Auth] Account loaded:', { role: account.role, userId: account.profile.id, email: account.profile.email });
       if (account.role === 'super_admin') {
         const result = await prepareAdminMFA(account);
         if (!result.success) {
+          console.error('[Auth] MFA setup failed for super_admin:', result.error);
           try {
             const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' });
             if (signOutError) result.error = `${result.error || 'MFA setup failed.'} ${signOutError.message}`;
           } catch (signOutError) {
             result.error = `${result.error || 'MFA setup failed.'} ${signOutError instanceof Error ? signOutError.message : 'Session sign-out failed.'}`;
           }
+        } else {
+          console.log('[Auth] MFA flow initiated:', { requiresMFA: result.requiresMFA, requiresMFASetup: result.requiresMFASetup });
         }
         return result;
       }
 
       setAuthenticatedAccount(account);
+      console.log('[Auth] Sign-in successful:', { role: account.role, userId: account.profile.id });
       return { success: true };
     } catch (error) {
+      console.error('[Auth] Sign-in error during account load:', error);
       let signOutMessage = '';
       try {
         const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' });
@@ -508,23 +524,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const completeMFA = async (code: string): Promise<LoginResult> => {
-    if (!pendingAccount) return { success: false, error: 'Your sign-in step expired. Please sign in again.' };
+    if (!pendingAccount) {
+      console.error('[Auth] MFA completion failed: No pending account');
+      return { success: false, error: 'Your sign-in step expired. Please sign in again.' };
+    }
     if (!/^\d{6}$/.test(code)) return { success: false, error: 'Enter the current 6-digit authenticator code.' };
 
     setIsLoading(true);
     try {
       const factorId = mfaSetup?.factorId;
       if (factorId) {
+        console.log('[Auth] Verifying MFA setup with code');
         const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId, code });
-        if (error) return { success: false, error: error.message };
+        if (error) {
+          console.error('[Auth] MFA setup verification failed:', error.message);
+          return { success: false, error: error.message };
+        }
         setAuthenticatedAccount(pendingAccount);
+        console.log('[Auth] MFA setup completed successfully');
         return { success: true };
       }
 
+      console.log('[Auth] Verifying MFA code with existing factor');
       const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
-      if (factorsError) return { success: false, error: factorsError.message };
+      if (factorsError) {
+        console.error('[Auth] Failed to list MFA factors:', factorsError.message);
+        return { success: false, error: factorsError.message };
+      }
       const verifiedFactor = factors.totp.find((factor) => factor.status === 'verified');
       if (!verifiedFactor) {
+        console.error('[Auth] No verified MFA factor found');
         return { success: false, error: 'No verified authenticator is available. Sign in again to set one up.' };
       }
 
@@ -532,8 +561,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         factorId: verifiedFactor.id,
         code,
       });
-      if (error) return { success: false, error: error.message };
+      if (error) {
+        console.error('[Auth] MFA verification failed:', error.message);
+        return { success: false, error: error.message };
+      }
       setAuthenticatedAccount(pendingAccount);
+      console.log('[Auth] MFA verification successful');
       return { success: true };
     } finally {
       setIsLoading(false);
