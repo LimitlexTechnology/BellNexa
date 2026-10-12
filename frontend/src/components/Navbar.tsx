@@ -13,16 +13,19 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useBellState } from '../context/BellStateContext';
 import { BellNexaLogo } from './BellNexaLogo';
-import { VilacEmblem } from './VilacEmblem';
+import { SchoolLogo } from './SchoolLogo';
 
 export const Navbar: React.FC = () => {
   const { 
     user, 
     currentSchool, 
+    currentCampus,
+    workspaces,
     role, 
     logout,
     setBellPhoneMode,
     updateProfile,
+    switchWorkspace,
     accountSyncStatus,
     accountSyncError
   } = useAuth();
@@ -30,12 +33,15 @@ export const Navbar: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [preferredTimezone, setPreferredTimezone] = useState('');
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   const openSettings = () => {
     setFullName(user?.full_name || '');
     setPhone(user?.phone || '');
+    setPreferredTimezone(user?.preferred_timezone || '');
     setIsSettingsOpen(true);
   };
 
@@ -45,7 +51,7 @@ export const Navbar: React.FC = () => {
     setProfileError(null);
     setIsSavingProfile(true);
     try {
-      await updateProfile({ full_name: fullName, phone });
+      await updateProfile({ full_name: fullName, phone, preferred_timezone: preferredTimezone });
       setIsSettingsOpen(false);
     } catch (error) {
       setProfileError(error instanceof Error ? error.message : 'Unable to save your profile.');
@@ -70,9 +76,7 @@ export const Navbar: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2">
             <span className="font-black text-lg text-white tracking-tight">BellNexa</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-cyan-400/10 text-[#54DDF4] border border-cyan-300/30">
-              PILOT v1.0
-            </span>
+            {currentCampus && <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-cyan-400/10 text-[#54DDF4] border border-cyan-300/30">{currentCampus.name}</span>}
           </div>
           <p className="text-[11px] text-slate-400 font-medium hidden sm:block">
             Smart School Bell and Announcement Management
@@ -83,12 +87,40 @@ export const Navbar: React.FC = () => {
       {/* Active School Tenant Context */}
       {currentSchool && (
         <div className="hidden md:flex items-center space-x-2.5 px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700/60">
-          <VilacEmblem size="sm" className="w-5 h-5" />
+          <SchoolLogo school={currentSchool} className="h-8 w-8" />
           <div className="text-xs">
-            <span className="text-slate-400 font-medium">Tenant: </span>
             <span className="font-bold text-white">{currentSchool.name}</span>
             <span className="ml-1.5 text-[10px] text-[#54DDF4] font-mono">({currentSchool.code})</span>
           </div>
+        </div>
+      )}
+      {workspaces.length > 1 && currentSchool && currentCampus && (
+        <div className="hidden lg:flex items-center gap-2">
+          <label htmlFor="workspace-switcher" className="text-[10px] text-slate-400">Campus</label>
+          <select
+            id="workspace-switcher"
+            value={`${currentSchool.id}:${currentCampus.id}`}
+            onChange={event => {
+              const [schoolId, campusId] = event.target.value.split(':');
+              try {
+                switchWorkspace(schoolId, campusId);
+                setWorkspaceError(null);
+              } catch (error) {
+                setWorkspaceError(error instanceof Error ? error.message : 'Unable to switch campus.');
+              }
+            }}
+            title={workspaceError || 'Switch your active school campus'}
+            className="max-w-48 bg-slate-800 text-xs text-white border border-slate-700 rounded-lg px-2 py-1.5"
+          >
+            {workspaces.map(workspace => (
+              <option
+                key={`${workspace.school.id}:${workspace.campus.id}:${workspace.role}`}
+                value={`${workspace.school.id}:${workspace.campus.id}`}
+              >
+                {workspace.school.name} / {workspace.campus.name}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 
@@ -195,6 +227,19 @@ export const Navbar: React.FC = () => {
               <div>
                 <label htmlFor="profile-phone" className="block text-xs font-bold text-slate-300 mb-1">Phone</label>
                 <input id="profile-phone" type="tel" value={phone} onChange={event => setPhone(event.target.value)} className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-400" />
+              </div>
+              <div>
+                <label htmlFor="preferred-timezone" className="block text-xs font-bold text-slate-300 mb-1">Preferred time zone (IANA)</label>
+                <input
+                  id="preferred-timezone"
+                  value={preferredTimezone}
+                  onChange={event => setPreferredTimezone(event.target.value)}
+                  placeholder={currentCampus?.timezone || currentSchool?.timezone || 'Europe/London'}
+                  className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-400"
+                />
+                <p className="mt-1 text-[10px] text-slate-400">
+                  Leave blank to use the school or campus time zone. Use an IANA name such as Europe/London.
+                </p>
               </div>
             </div>
 

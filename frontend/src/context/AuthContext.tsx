@@ -1,7 +1,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Session } from '@supabase/supabase-js';
-import { Invitation, Profile, School, UserRole } from '../types/database';
+import { Campus, Invitation, Profile, School, UserRole } from '../types/database';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { isValidIanaTimeZone } from '../lib/timezone';
 
 interface LoginResult {
   success: boolean;
@@ -20,11 +21,21 @@ interface PendingAccount {
   profile: Profile;
   role: UserRole;
   school: School | null;
+  campus: Campus | null;
+  workspaces: SchoolWorkspace[];
+}
+
+interface SchoolWorkspace {
+  role: UserRole;
+  school: School;
+  campus: Campus;
 }
 
 interface AuthContextType {
   user: Profile | null;
   currentSchool: School | null;
+  currentCampus: Campus | null;
+  workspaces: SchoolWorkspace[];
   role: UserRole | null;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -43,13 +54,20 @@ interface AuthContextType {
   completeMFA: (code: string) => Promise<LoginResult>;
   cancelPendingSignIn: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<{ error?: string }>;
-  updatePassword: (password: string) => Promise<{ error?: string }>;
-  updateProfile: (updates: Pick<Profile, 'full_name' | 'phone'>) => Promise<void>;
+  updatePassword: (password: string, invitationToken?: string) => Promise<{ error?: string }>;
+  updateProfile: (updates: Pick<Profile, 'full_name' | 'phone' | 'preferred_timezone'>) => Promise<void>;
   refreshInvitations: () => Promise<void>;
-  createInvitation: (email: string, fullName: string, role: 'principal' | 'regulator', schoolId: string) => Promise<Invitation>;
+  createInvitation: (
+    email: string,
+    fullName: string,
+    role: Exclude<UserRole, 'super_admin'>,
+    schoolId: string,
+    campusId: string,
+  ) => Promise<Invitation>;
   revokeInvitation: (id: string) => Promise<void>;
   logout: () => Promise<void>;
   setCurrentSchool: (school: School | null) => void;
+  switchWorkspace: (schoolId: string, campusId: string) => void;
 }
 
 export const MOCK_VILAC_SCHOOL: School = {
@@ -57,6 +75,10 @@ export const MOCK_VILAC_SCHOOL: School = {
   name: 'Vilac International School',
   code: 'VILAC-ACCRA',
   timezone: 'Africa/Accra',
+  country: 'Ghana',
+  city: 'Accra',
+  default_open_time: '07:00:00',
+  default_close_time: '16:00:00',
   branding_primary: '#0A1B45',
   branding_secondary: '#087F9B',
   branding_accent: '#12C8E8',
@@ -91,7 +113,7 @@ const functionErrorMessage = async (error: Error): Promise<string> => {
 const getPendingAccount = async (session: Session): Promise<PendingAccount> => {
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('id, email, full_name, phone, is_super_admin, is_active, must_change_password, created_at, updated_at')
+    .select('id, email, full_name, phone, preferred_timezone, is_super_admin, is_active, must_change_password, created_at, updated_at')
     .eq('id', session.user.id)
     .maybeSingle();
 
@@ -110,53 +132,72 @@ const getPendingAccount = async (session: Session): Promise<PendingAccount> => {
   };
 
   if (profile.is_super_admin) {
-    return { profile: accountProfile, role: 'super_admin', school: null };
+    return { profile: accountProfile, role: 'super_admin', school: null, campus: null, workspaces: [] };
   }
 
   const { data: memberships, error: membershipsError } = await supabase
     .from('school_memberships')
-    .select('school_id, role')
+    .select('school_id, campus_id, role')
     .eq('user_id', session.user.id)
     .eq('is_approved', true)
-    .order('created_at', { ascending: true })
-    .limit(1);
+    .order('created_at', { ascending: true });
 
   if (membershipsError) throw membershipsError;
-  const membership = memberships?.[0];
-  const role = membership ? roleFromMembership(membership.role) : null;
-  if (!membership || !role) {
+  if (!memberships?.length) {
     throw new Error('Your account does not have an approved school role. Contact your school administrator.');
+  }
+
+  const schoolIds = [...new Set(memberships.map(membership => membership.school_id))];
+  const campusIds = [...new Set(memberships.map(membership => membership.campus_id))];
+  const [{ data: schools, error: schoolsError }, { data: campuses, error: campusesError }] = await Promise.all([
+    supabase.from('schools')
+      .select('id, name, code, timezone, country, region, city, address, default_open_time, default_close_time, logo_url, branding_primary, branding_secondary, branding_accent, is_active, created_at, updated_at')
+      .in('id', schoolIds),
+    supabase.from('campuses')
+      .select('id, school_id, name, country, region, city, address, timezone, logo_url, default_open_time, default_close_time, settings, is_default, is_active, created_at, updated_at')
+      .in('id', campusIds),
+  ]);
+  if (schoolsError) throw schoolsError;
+  if (campusesError) throw campusesError;
+  const schoolById = new Map((schools || []).map(school => [school.id, school]));
+  const campusById = new Map((campuses || []).map(campus => [campus.id, campus]));
+  const workspaces = memberships.flatMap(membership => {
+    const membershipRole = roleFromMembership(membership.role);
+    const school = schoolById.get(membership.school_id);
+    const campus = campusById.get(membership.campus_id);
+    if (!membershipRole || !school?.is_active || !campus?.is_active || campus.school_id !== school.id) return [];
+    return [{ role: membershipRole, school, campus }];
+  });
+  const activeWorkspace = workspaces[0];
+  if (!activeWorkspace) {
+    throw new Error('Your assigned school or campus is unavailable. Contact your school administrator.');
   }
 
   if (profile.must_change_password) {
     return {
-      profile: { ...accountProfile, role },
-      role,
+      profile: { ...accountProfile, role: activeWorkspace.role },
+      role: activeWorkspace.role,
       school: null,
+      campus: null,
+      workspaces,
     };
   }
 
-  const { data: school, error: schoolError } = await supabase
-    .from('schools')
-    .select('id, name, code, timezone, logo_url, branding_primary, branding_secondary, branding_accent, is_active, created_at, updated_at')
-    .eq('id', membership.school_id)
-    .maybeSingle();
-
-  if (schoolError) throw schoolError;
-  if (!school || !school.is_active) {
-    throw new Error('Your assigned school is unavailable. Contact your school administrator.');
-  }
-
   return {
-    profile: { ...accountProfile, role },
-    role,
-    school,
+    profile: { ...accountProfile, role: activeWorkspace.role },
+    role: activeWorkspace.role,
+    school: activeWorkspace.school,
+    campus: activeWorkspace.campus,
+    workspaces,
   };
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<Profile | null>(null);
   const [currentSchool, setCurrentSchool] = useState<School | null>(null);
+  const [currentCampus, setCurrentCampus] = useState<Campus | null>(null);
+  const [workspaces, setWorkspaces] = useState<SchoolWorkspace[]>([]);
+  const selectedWorkspaceRef = useRef<string | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
   const [isLoading, setIsLoading] = useState(() => isSupabaseConfigured());
   const [authError, setAuthError] = useState<string | null>(null);
@@ -174,9 +215,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const setAuthenticatedAccount = useCallback((account: PendingAccount) => {
-    setUser(account.profile);
-    setRole(account.role);
-    setCurrentSchool(account.school);
+    const selectedWorkspace = account.workspaces.find(
+      workspace => `${workspace.school.id}:${workspace.campus.id}` === selectedWorkspaceRef.current,
+    ) ?? account.workspaces[0];
+    const activeRole = selectedWorkspace?.role ?? account.role;
+    const activeSchool = selectedWorkspace?.school ?? account.school;
+    const activeCampus = selectedWorkspace?.campus ?? account.campus;
+    if (selectedWorkspace) selectedWorkspaceRef.current = `${activeSchool?.id}:${activeCampus?.id}`;
+    setUser({ ...account.profile, role: activeRole });
+    setRole(activeRole);
+    setCurrentSchool(activeSchool);
+    setCurrentCampus(activeCampus);
+    setWorkspaces(account.workspaces);
     setRequiresPasswordSetup(account.profile.must_change_password);
     setMfaSetup(null);
     setPendingAccount(null);
@@ -241,6 +291,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
         setRole(null);
         setCurrentSchool(null);
+        setCurrentCampus(null);
+        setWorkspaces([]);
+        selectedWorkspaceRef.current = null;
+        setCurrentCampus(null);
         setPendingAccount(null);
         setMfaSetup(null);
         setRequiresPasswordSetup(false);
@@ -317,6 +371,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setUser(null);
             setRole(null);
             setCurrentSchool(null);
+            setCurrentCampus(null);
             setInvitations([]);
             setAuthError(`${message}${signOutError ? ` Sign-out failed: ${signOutError.message}` : ''}`);
           } else {
@@ -515,12 +570,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return error ? { error: error.message } : {};
   };
 
-  const updatePassword = async (password: string): Promise<{ error?: string }> => {
+  const updatePassword = async (password: string, invitationToken?: string): Promise<{ error?: string }> => {
     const { error } = await supabase.auth.updateUser({ password });
     if (error) return { error: error.message };
     if (requiresPasswordSetup) {
+      if (!invitationToken || !/^[0-9a-f]{64}$/i.test(invitationToken)) {
+        return { error: 'Enter the 64-character invitation token from your invitation email.' };
+      }
       const { error: setupError } = await supabase.functions.invoke('manage-invitations', {
-        body: { action: 'complete-setup' },
+        body: { action: 'complete-setup', invitationToken },
       });
       if (setupError) return { error: await functionErrorMessage(setupError) };
       setRequiresPasswordSetup(false);
@@ -532,45 +590,64 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return {};
   };
 
-  const updateProfile = async (updates: Pick<Profile, 'full_name' | 'phone'>): Promise<void> => {
+  const updateProfile = async (
+    updates: Pick<Profile, 'full_name' | 'phone' | 'preferred_timezone'>,
+  ): Promise<void> => {
     if (!user) throw new Error('Sign in before changing your profile.');
     const fullName = updates.full_name.trim();
     if (!fullName) throw new Error('Name cannot be empty.');
     const phone = updates.phone?.trim() || null;
+    const preferredTimezone = updates.preferred_timezone?.trim() || null;
+    if (preferredTimezone && !isValidIanaTimeZone(preferredTimezone)) {
+      throw new Error('Enter a valid IANA time zone, such as Europe/London.');
+    }
     const { data, error } = await supabase
       .from('profiles')
-      .update({ full_name: fullName, phone })
+      .update({ full_name: fullName, phone, preferred_timezone: preferredTimezone })
       .eq('id', user.id)
-      .select('id, email, full_name, phone, is_super_admin, is_active, must_change_password, created_at, updated_at')
+      .select('id, email, full_name, phone, preferred_timezone, is_super_admin, is_active, must_change_password, created_at, updated_at')
       .single();
     if (error) throw error;
     setUser({ ...data, role: role ?? user.role, requires_2fa: data.is_super_admin });
   };
 
+  const switchWorkspace = useCallback((schoolId: string, campusId: string): void => {
+    const workspace = workspaces.find(item =>
+      item.school.id === schoolId && item.campus.id === campusId,
+    );
+    if (!workspace) throw new Error('You do not have access to that school campus.');
+    selectedWorkspaceRef.current = `${schoolId}:${campusId}`;
+    setCurrentSchool(workspace.school);
+    setCurrentCampus(workspace.campus);
+    setRole(workspace.role);
+    setUser(current => current ? { ...current, role: workspace.role } : current);
+  }, [workspaces]);
+
   const refreshInvitations = useCallback(async (): Promise<void> => {
-    if (role !== 'super_admin') {
+    if (!user || !['super_admin', 'admin', 'principal'].includes(role ?? '')) {
       setInvitations([]);
       return;
     }
     const { data, error } = await supabase
       .from('invitations')
-      .select('id, school_id, email, role, expires_at, is_used, revoked_at, created_by, created_at')
+      .select('id, reference, school_id, campus_id, email, role, expires_at, is_used, revoked_at, created_by, created_at')
       .order('created_at', { ascending: false });
     if (error) throw error;
     setInvitations((data ?? []).map((invitation) => ({
       ...invitation,
       invited_by: invitation.created_by,
     })));
-  }, [role]);
+  }, [role, user]);
 
   const createInvitation = useCallback(async (
     email: string,
     fullName: string,
-    invitationRole: 'principal' | 'regulator',
+    invitationRole: Exclude<UserRole, 'super_admin'>,
     schoolId: string,
+    campusId: string,
   ): Promise<Invitation> => {
     const { data, error } = await supabase.functions.invoke('manage-invitations', {
-      body: { action: 'invite', email, fullName, role: invitationRole, schoolId },
+      body: { action: 'invite', email, fullName, role: invitationRole, schoolId, campusId },
     });
     if (error) throw new Error(await functionErrorMessage(error));
     if (!data?.invitation) throw new Error('The invitation service returned no invitation record.');
@@ -599,6 +676,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         currentSchool,
+        currentCampus,
+        workspaces,
         role,
         isAuthenticated: !!user,
         isLoading,
@@ -624,6 +703,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         revokeInvitation,
         logout,
         setCurrentSchool,
+        switchWorkspace,
       }}
     >
       {children}

@@ -13,6 +13,7 @@ import {
 import { useBellState } from '../context/BellStateContext';
 import { useAuth } from '../context/AuthContext';
 import { ScheduleEvent, EventCategory } from '../types/database';
+import { getPreferredTimeZone } from '../lib/timezone';
 
 const DAYS = [
   { id: 1, name: 'Monday', short: 'Mon' },
@@ -25,7 +26,7 @@ const DAYS = [
 ];
 
 export const RegulatorDashboard: React.FC = () => {
-  const { user, currentSchool } = useAuth();
+  const { user, currentSchool, currentCampus } = useAuth();
   const { 
     events, 
     createDraftEvent, 
@@ -38,6 +39,11 @@ export const RegulatorDashboard: React.FC = () => {
     activeRingingEvent,
     scheduleRevision
   } = useBellState();
+  const scheduleTimeZone = getPreferredTimeZone(
+    user?.preferred_timezone,
+    currentCampus?.timezone,
+    currentSchool?.timezone,
+  );
 
   const [selectedDay, setSelectedDay] = useState<number>(1);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -175,7 +181,7 @@ export const RegulatorDashboard: React.FC = () => {
               Schedule Regulator Workspace
             </span>
             <span className="text-xs text-slate-400 font-mono">
-              Live Device Rev #{scheduleRevision}
+              {currentCampus?.name || 'Campus'} &bull; {scheduleTimeZone} &bull; Live Device Rev #{scheduleRevision}
             </span>
           </div>
           <h1 className="text-2xl font-black text-white mt-1">
@@ -523,7 +529,7 @@ export const RegulatorDashboard: React.FC = () => {
 
                 <div>
                   <label className="block font-bold text-slate-300 mb-1">
-                    Start Time (HH:mm)
+                    Start Time ({scheduleTimeZone})
                   </label>
                   <input
                     type="time"

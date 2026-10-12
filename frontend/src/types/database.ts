@@ -8,6 +8,7 @@ export interface Profile {
   is_super_admin: boolean;
   is_active: boolean;
   must_change_password: boolean;
+  preferred_timezone?: string | null;
   role?: UserRole;
   requires_2fa?: boolean;
   created_at: string;
@@ -19,6 +20,12 @@ export interface School {
   name: string;
   code: string;
   timezone: string;
+  country: string;
+  region?: string | null;
+  city?: string | null;
+  address?: string | null;
+  default_open_time: string;
+  default_close_time: string;
   logo_url?: string;
   branding_primary: string;
   branding_secondary: string;
@@ -28,13 +35,43 @@ export interface School {
   updated_at: string;
 }
 
+export interface Campus {
+  id: string;
+  school_id: string;
+  name: string;
+  country: string;
+  region?: string | null;
+  city?: string | null;
+  address?: string | null;
+  timezone: string;
+  logo_url?: string | null;
+  default_open_time: string;
+  default_close_time: string;
+  settings: Record<string, unknown>;
+  is_default: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface SchoolMembership {
   id: string;
   school_id: string;
+  campus_id: string;
   user_id: string;
   role: 'principal' | 'regulator' | 'admin' | 'support' | 'auditor';
   is_approved: boolean;
   created_at: string;
+}
+
+export interface SchoolSettings {
+  id: string;
+  school_id: string;
+  allow_late_playback: boolean;
+  emergency_contacts: Array<Record<string, unknown>>;
+  settings: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Device {
@@ -55,6 +92,7 @@ export interface Device {
 export interface Schedule {
   id: string;
   school_id: string;
+  campus_id: string;
   name: string;
   revision: number;
   is_active: boolean;
@@ -79,6 +117,7 @@ export interface ScheduleEvent {
   id: string;
   schedule_id: string;
   school_id: string;
+  campus_id?: string;
   event_name: string;
   category: EventCategory;
   start_time: string; // HH:mm:ss format
@@ -164,8 +203,11 @@ export interface SupportTicket {
 
 export interface Invitation {
   id: string;
+  reference: string;
   school_id: string;
   school_name?: string;
+  campus_id: string;
+  campus_name?: string;
   email: string;
   role: Exclude<UserRole, 'super_admin'>;
   expires_at: string;

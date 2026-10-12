@@ -24,6 +24,7 @@ export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [invitationToken, setInvitationToken] = useState('');
   const [authCode, setAuthCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(() => {
@@ -102,12 +103,13 @@ export const Login: React.FC = () => {
     event.preventDefault();
     setErrorMessage(null);
     try {
-      const result = await updatePassword(newPassword);
+      const result = await updatePassword(newPassword, requiresPasswordSetup ? invitationToken.trim() : undefined);
       if (result.error) {
         setErrorMessage(result.error);
         return;
       }
       setNewPassword('');
+      setInvitationToken('');
       setPassword('');
       setStep('credentials');
       setInfoMessage('Password updated. Sign in again with your new password.');
@@ -354,6 +356,25 @@ export const Login: React.FC = () => {
                         : 'Use at least 8 characters. You will need to sign in again after updating it.'}
                     </p>
                   </div>
+                  {requiresPasswordSetup && (
+                    <div>
+                      <label htmlFor="invitation-token" className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
+                        Invitation token
+                      </label>
+                      <input
+                        id="invitation-token"
+                        type="text"
+                        autoComplete="one-time-code"
+                        required
+                        pattern="[0-9a-fA-F]{64}"
+                        maxLength={64}
+                        value={invitationToken}
+                        onChange={(event) => setInvitationToken(event.target.value.trim())}
+                        placeholder="64-character token from your invitation email"
+                        className="w-full px-4 py-3 bg-white border-2 border-slate-300 rounded-xl text-sm font-mono text-slate-900 focus:outline-none focus:border-[#12C8E8]"
+                      />
+                    </div>
+                  )}
                   <label htmlFor="new-password" className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
                     New Password
                   </label>

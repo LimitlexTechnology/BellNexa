@@ -6,6 +6,7 @@ import {
   AuditLog
 } from '../types/database';
 import { useAuth } from './AuthContext';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 
 interface BellStateContextType {
   events: ScheduleEvent[];
@@ -19,6 +20,7 @@ interface BellStateContextType {
   activeRingingEvent: string | null;
   deviceOnline: boolean;
   lastSyncTime: string;
+  scheduleLoadError: string | null;
   scheduleRevision: number;
   availableVoices: SpeechSynthesisVoice[];
   selectedVoiceURI: string;
@@ -471,11 +473,14 @@ const speakText = (text: string, volume: number = 100, repeatCount: number = 1) 
 };
 
 export const BellStateProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, currentSchool } = useAuth();
+  const { user, currentSchool, currentCampus } = useAuth();
 
   const currentUserName = user?.full_name || 'System User';
   const currentUserEmail = user?.email || 'unknown@bellnexa.com';
-  const currentSchoolId = currentSchool?.id || '00000000-0000-0000-0000-000000000001';
+  const currentSchoolId = currentSchool?.id || '';
+  const isVilacPilotWorkspace = !isSupabaseConfigured()
+    && currentSchool?.id === '00000000-0000-0000-0000-000000000001'
+    && currentCampus?.is_default === true;
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoiceURIState, setSelectedVoiceURIState] = useState<string>(() => {
     if (typeof window === 'undefined') return '';
@@ -519,9 +524,9 @@ export const BellStateProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  const [events, setEvents] = useState<ScheduleEvent[]>(INITIAL_EVENTS);
-  const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>(INITIAL_PENDING_APPROVALS);
-  const [playbackHistory] = useState<PlaybackEvent[]>(INITIAL_PLAYBACK_HISTORY);
+  const [events, setEvents] = useState<ScheduleEvent[]>(() => isVilacPilotWorkspace ? INITIAL_EVENTS : []);
+  const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>(() => isVilacPilotWorkspace ? INITIAL_PENDING_APPROVALS : []);
+  const [playbackHistory, setPlaybackHistory] = useState<PlaybackEvent[]>(() => isVilacPilotWorkspace ? INITIAL_PLAYBACK_HISTORY : []);
   const [isBellsPaused, setIsBellsPaused] = useState<boolean>(false);
   const [isEmergencyStopped, setIsEmergencyStopped] = useState<boolean>(false);
   const [speakerConnected, setSpeakerConnected] = useState<boolean>(true);
@@ -530,8 +535,10 @@ export const BellStateProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [deviceOnline] = useState<boolean>(true);
   const [lastSyncTime, setLastSyncTime] = useState<string>('2 minutes ago');
   const [scheduleRevision, setScheduleRevision] = useState<number>(14);
+  const [activeScheduleId, setActiveScheduleId] = useState<string | null>(null);
+  const [scheduleLoadError, setScheduleLoadError] = useState<string | null>(null);
 
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(isVilacPilotWorkspace ? [
     {
       id: 'log-1',
       action: 'DEVICE_HEARTBEAT_ACK',
@@ -553,7 +560,102 @@ export const BellStateProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       metadata: { target_role: 'principal', email: 'principal@vilac.edu.gh' },
       created_at: new Date(DEMO_AUDIT_SEEDED_AT - 86400000 * 2).toISOString(),
     }
-  ]);
+  ] : []);
+
+  useEffect(() => {
+    let active = true;
+    setScheduleLoadError(null);
+
+    if (!isSupabaseConfigured()) {
+      setEvents(isVilacPilotWorkspace ? INITIAL_EVENTS : []);
+      setPendingApprovals(isVilacPilotWorkspace ? INITIAL_PENDING_APPROVALS : []);
+      setPlaybackHistory(isVilacPilotWorkspace ? INITIAL_PLAYBACK_HISTORY : []);
+      setAuditLogs(isVilacPilotWorkspace ? [
+        {
+          id: 'log-1',
+          action: 'DEVICE_HEARTBEAT_ACK',
+          resource_type: 'device',
+          metadata: { device_id: 'VILAC-HW01', battery: 94, speaker: 'CONNECTED' },
+          created_at: new Date(DEMO_AUDIT_SEEDED_AT - 120000).toISOString(),
+        },
+        {
+          id: 'log-2',
+          action: 'SCHEDULE_DRAFT_SUBMITTED',
+          resource_type: 'schedule_event',
+          metadata: { submitted_by: 'regulator@vilac.edu.gh', event: 'Lunch Break Bell (+15 min)' },
+          created_at: new Date(DEMO_AUDIT_SEEDED_AT - 7200000).toISOString(),
+        },
+        {
+          id: 'log-3',
+          action: 'INVITATION_ISSUED',
+          resource_type: 'invitation',
+          metadata: { target_role: 'principal', email: 'principal@vilac.edu.gh' },
+          created_at: new Date(DEMO_AUDIT_SEEDED_AT - 86400000 * 2).toISOString(),
+        },
+      ] : []);
+      setScheduleRevision(isVilacPilotWorkspace ? 14 : 0);
+      setActiveScheduleId(null);
+      return () => { active = false; };
+    }
+
+    if (!currentSchool || !currentCampus) {
+      setEvents([]);
+      setPendingApprovals([]);
+      setPlaybackHistory([]);
+      setAuditLogs([]);
+      setScheduleRevision(0);
+      setActiveScheduleId(null);
+      return () => { active = false; };
+    }
+
+    const loadCampusSchedule = async () => {
+      const { data: schedule, error: scheduleError } = await supabase
+        .from('schedules')
+        .select('id, revision')
+        .eq('school_id', currentSchool.id)
+        .eq('campus_id', currentCampus.id)
+        .eq('is_active', true)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (scheduleError) throw scheduleError;
+      if (!schedule) throw new Error('No active timetable is configured for this campus.');
+
+      const { data, error } = await supabase
+        .from('schedule_events')
+        .select('*')
+        .eq('school_id', currentSchool.id)
+        .eq('campus_id', currentCampus.id)
+        .eq('schedule_id', schedule.id)
+        .order('start_time', { ascending: true });
+      if (error) throw error;
+      if (!active) return;
+      const campusEvents = (data || []) as ScheduleEvent[];
+      setActiveScheduleId(schedule.id);
+      setScheduleRevision(schedule.revision);
+      setEvents(campusEvents);
+      setPendingApprovals(campusEvents
+        .filter(event => event.approval_status === 'awaiting_principal')
+        .map(event => ({
+          id: event.id,
+          school_id: event.school_id,
+          type: 'timetable_edit' as const,
+          title: `${event.event_name} (${event.start_time})`,
+          description: event.change_summary || `${event.last_edited_by || 'A regulator'} submitted a schedule change.`,
+          target_event_id: event.id,
+          submitted_by: event.last_edited_by || '',
+          submitted_by_name: event.last_edited_by || 'Campus regulator',
+          submitted_at: event.updated_at || event.created_at,
+          status: 'pending' as const,
+        })));
+      setPlaybackHistory([]);
+      setAuditLogs([]);
+    };
+    void loadCampusSchedule().catch(error => {
+      if (active) setScheduleLoadError(error instanceof Error ? error.message : 'Unable to load this campus timetable.');
+    });
+    return () => { active = false; };
+  }, [currentCampus?.id, currentSchool?.id, isVilacPilotWorkspace, setAuditLogs, setPlaybackHistory]);
 
   // Audio Test Play — plays the Westminster chime as an attention signal,
   // then speaks the announcement text (TTS) so the voice announcement is actually heard.

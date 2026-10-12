@@ -1,0 +1,17 @@
+<html>
+  <body>
+    <h2>You are invited to BellNexa</h2>
+    <p>
+      You have been invited to manage {{ .Data.school_name }} —
+      {{ .Data.campus_name }} as a {{ .Data.role }}.
+    </p>
+    <p><a href="{{ .ConfirmationURL }}">Accept invitation and continue</a></p>
+    <p>
+      After confirming your email, enter this one-time invitation token on
+      BellNexa to finish setting your password:
+    </p>
+    <p><code>{{ .Data.invitation_token }}</code></p>
+    <p>This invitation expires in one hour and can only be used once.</p>
+    <p>If you were not expecting this invitation, you can ignore this email.</p>
+  </body>
+</html>

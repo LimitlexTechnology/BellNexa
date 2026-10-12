@@ -11,10 +11,11 @@ import {
 } from 'lucide-react';
 import { useBellState } from '../context/BellStateContext';
 import { useAuth } from '../context/AuthContext';
-import { VilacEmblem } from '../components/VilacEmblem';
+import { SchoolLogo } from '../components/SchoolLogo';
+import { formatCountdown, formatTimeInTimeZone, getNextScheduleOccurrence, getPreferredTimeZone } from '../lib/timezone';
 
 export const BellPhoneScreen: React.FC = () => {
-  const { setBellPhoneMode } = useAuth();
+  const { setBellPhoneMode, currentSchool, currentCampus } = useAuth();
   const { 
     events, 
     speakerConnected, 
@@ -41,29 +42,16 @@ export const BellPhoneScreen: React.FC = () => {
 
   // Filter live approved events
   const liveEvents = events.filter(e => e.approval_status === 'live_on_device' && e.is_enabled);
-  const currentTimeString = currentTime.toTimeString().substring(0, 5);
-  const sortedLiveEvents = [...liveEvents].sort((a, b) => a.start_time.localeCompare(b.start_time));
-  const nextBell = sortedLiveEvents.find(e => e.start_time > currentTimeString) || sortedLiveEvents[0];
-
-  // Countdown computation
-  const getCountdown = () => {
-    if (!nextBell) return '00:00:00';
-    const [h, m] = nextBell.start_time.split(':').map(Number);
-    const target = new Date();
-    target.setHours(h, m, 0, 0);
-
-    let diff = target.getTime() - currentTime.getTime();
-    if (diff < 0) {
-      target.setDate(target.getDate() + 1);
-      diff = target.getTime() - currentTime.getTime();
-    }
-
-    const hours = Math.floor(diff / 3600000);
-    const mins = Math.floor((diff % 3600000) / 60000);
-    const secs = Math.floor((diff % 60000) / 1000);
-
-    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  };
+  const scheduleTimeZone = getPreferredTimeZone(null, currentCampus?.timezone, currentSchool?.timezone);
+  const nextOccurrence = liveEvents
+    .map(event => ({
+      event,
+      occurrence: getNextScheduleOccurrence(event.start_time, event.days_of_week, scheduleTimeZone, currentTime),
+    }))
+    .filter((item): item is { event: typeof liveEvents[number]; occurrence: Date } => item.occurrence !== null)
+    .sort((left, right) => left.occurrence.getTime() - right.occurrence.getTime())[0];
+  const nextBell = nextOccurrence?.event;
+  const getCountdown = () => formatCountdown(nextOccurrence?.occurrence ?? null, currentTime);
 
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col justify-between p-4 sm:p-6 md:p-8 select-none font-sans relative overflow-hidden">
@@ -72,11 +60,11 @@ export const BellPhoneScreen: React.FC = () => {
       <header className="flex items-center justify-between border-b border-slate-800 pb-4">
         {/* School Crest & Mode */}
         <div className="flex items-center space-x-3">
-          <VilacEmblem size="sm" />
+          {currentSchool && <SchoolLogo school={currentSchool} className="h-8 w-8" />}
           <div>
             <div className="flex items-center space-x-2">
               <span className="text-xs font-black tracking-wider uppercase text-white">
-                Vilac International School
+                {currentSchool?.name || 'BellNexa School'}
               </span>
               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-800 text-emerald-400 font-bold">
                 UNATTENDED KIOSK
@@ -210,7 +198,7 @@ export const BellPhoneScreen: React.FC = () => {
               {nextBell?.event_name || 'No Upcoming Events'}
             </h2>
             <div className="text-xs font-mono text-[#54DDF4] font-bold">
-              Scheduled at {nextBell?.start_time || '--:--'} GMT &bull; Repeats {nextBell?.repeat_count || 3}x
+              Scheduled at {nextBell?.start_time || '--:--'} ({scheduleTimeZone}) &bull; Repeats {nextBell?.repeat_count || 3}x
             </div>
           </div>
 

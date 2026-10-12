@@ -6,8 +6,9 @@ type InviteRequest = {
   action: 'invite';
   email: string;
   fullName: string;
-  role: 'principal' | 'regulator';
+  role: 'principal' | 'regulator' | 'admin' | 'support' | 'auditor';
   schoolId: string;
+  campusId: string;
 };
 type RevokeRequest = { action: 'revoke'; invitationId: string };
 
@@ -103,9 +104,58 @@ const authorizeSuperAdmin = async (
   return null;
 };
 
+const authorizeInvitationManager = async (
+  userClient: SupabaseClient,
+  adminClient: SupabaseClient,
+  accessToken: string,
+  caller: Caller,
+  schoolId: string,
+  campusId: string,
+  invitedRole?: InviteRequest['role'],
+): Promise<Response | null> => {
+  if (!caller.emailConfirmed) {
+    return jsonResponse({ error: 'Confirm your email before managing invitations.' }, 403);
+  }
+
+  const { data: profile, error: profileError } = await adminClient
+    .from('profiles')
+    .select('is_super_admin, is_active, must_change_password')
+    .eq('id', caller.id)
+    .maybeSingle();
+  if (profileError) return jsonResponse({ error: 'Unable to verify invitation permissions.' }, 500);
+  if (!profile?.is_active || profile.must_change_password) {
+    return jsonResponse({ error: 'This account is inactive or still requires password setup.' }, 403);
+  }
+  if (profile.is_super_admin) {
+    return authorizeSuperAdmin(userClient, adminClient, accessToken, caller);
+  }
+
+  if (invitedRole === 'admin') {
+    return jsonResponse({ error: 'Only a verified Super Admin can invite a school administrator.' }, 403);
+  }
+
+  const { data: membership, error: membershipError } = await adminClient
+    .from('school_memberships')
+    .select('id')
+    .eq('school_id', schoolId)
+    .eq('campus_id', campusId)
+    .eq('user_id', caller.id)
+    .eq('is_approved', true)
+    .in('role', ['admin', 'principal'])
+    .maybeSingle();
+  if (membershipError) return jsonResponse({ error: 'Unable to verify campus administrator permissions.' }, 500);
+  if (!membership) return jsonResponse({ error: 'Invitation management is not authorized for this school and campus.' }, 403);
+  return null;
+};
+
 const sha256 = async (value: string): Promise<string> => {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+};
+
+const makeInvitationToken = (): string => {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 };
 
 const removePartialInvite = async (adminClient: SupabaseClient, userId: string): Promise<boolean> => {
@@ -141,6 +191,17 @@ const handleInvite = async (
     return jsonResponse({ error: 'Choose an active school registered in BellNexa.' }, 404, origin);
   }
 
+  const { data: campus, error: campusError } = await adminClient
+    .from('campuses')
+    .select('id, school_id, name, is_active')
+    .eq('id', body.campusId)
+    .eq('school_id', school.id)
+    .maybeSingle();
+  if (campusError) return jsonResponse({ error: 'Unable to verify the selected campus.' }, 500, origin);
+  if (!campus || !campus.is_active) {
+    return jsonResponse({ error: 'Choose an active campus belonging to the selected school.' }, 404, origin);
+  }
+
   const { data: existingProfile, error: existingProfileError } = await adminClient
     .from('profiles')
     .select('id')
@@ -152,9 +213,16 @@ const handleInvite = async (
   }
 
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  const invitationToken = makeInvitationToken();
   const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {
     redirectTo: `${origin}/`,
-    data: { full_name: fullName, school_name: school.name, role: body.role },
+    data: {
+      full_name: fullName,
+      school_name: school.name,
+      campus_name: campus.name,
+      role: body.role,
+      invitation_token: invitationToken,
+    },
   });
   if (inviteError || !inviteData.user) {
     return jsonResponse({ error: inviteError?.message ?? 'Unable to create the account invitation.' }, 400, origin);
@@ -177,6 +245,7 @@ const handleInvite = async (
     .from('school_memberships')
     .insert({
       school_id: school.id,
+      campus_id: campus.id,
       user_id: inviteData.user.id,
       role: body.role,
       is_approved: true,
@@ -190,18 +259,23 @@ const handleInvite = async (
     }, 500, origin);
   }
 
+  const invitationId = crypto.randomUUID();
+  const reference = `INV-${invitationId.replaceAll('-', '').slice(0, 10).toUpperCase()}`;
   const { data: invitation, error: invitationError } = await adminClient
     .from('invitations')
     .insert({
+      id: invitationId,
+      reference,
       school_id: school.id,
+      campus_id: campus.id,
       email,
       role: body.role,
-      token_hash: await sha256(crypto.randomUUID()),
+      token_hash: await sha256(invitationToken),
       expires_at: expiresAt,
       created_by: caller.id,
       auth_user_id: inviteData.user.id,
     })
-    .select('id, school_id, email, role, expires_at, is_used, revoked_at, created_at')
+    .select('id, reference, school_id, campus_id, email, role, expires_at, is_used, revoked_at, created_at')
     .single();
   if (invitationError) {
     const now = new Date().toISOString();
@@ -222,16 +296,30 @@ const handleInvite = async (
 
 const handleRevoke = async (
   invitationId: string,
+  userClient: SupabaseClient,
   adminClient: SupabaseClient,
+  accessToken: string,
+  caller: Caller,
   origin: string,
 ): Promise<Response> => {
   const { data: invitation, error: lookupError } = await adminClient
     .from('invitations')
-    .select('id, auth_user_id, is_used, revoked_at')
+    .select('id, school_id, campus_id, auth_user_id, is_used, revoked_at')
     .eq('id', invitationId)
     .maybeSingle();
   if (lookupError) return jsonResponse({ error: 'Unable to load this invitation.' }, 500, origin);
   if (!invitation) return jsonResponse({ error: 'Invitation not found.' }, 404, origin);
+  const authorizationError = await authorizeInvitationManager(
+    userClient,
+    adminClient,
+    accessToken,
+    caller,
+    invitation.school_id,
+    invitation.campus_id,
+  );
+  if (authorizationError) {
+    return jsonResponse(await authorizationError.json() as Record<string, unknown>, authorizationError.status, origin);
+  }
   if (invitation.is_used) return jsonResponse({ error: 'This invitation has already been activated and cannot be revoked as an invitation.' }, 409, origin);
   if (invitation.revoked_at) return jsonResponse({ error: 'This invitation was already revoked.' }, 409, origin);
 
@@ -278,16 +366,36 @@ const handleRevoke = async (
 
 const handleCompleteSetup = async (
   userClient: SupabaseClient,
+  adminClient: SupabaseClient,
+  caller: Caller,
+  invitationToken: string,
   origin: string,
 ): Promise<Response> => {
-  const { error } = await userClient.rpc('complete_invitation_password_setup');
+  if (!/^[0-9a-f]{64}$/i.test(invitationToken)) {
+    return jsonResponse({ error: 'Enter the invitation token from your invitation email.' }, 400, origin);
+  }
+  const { error } = await userClient.rpc('complete_invitation_password_setup', {
+    invite_token_hash: await sha256(invitationToken),
+  });
   if (error) {
-    const expired = error.message.toLowerCase().includes('expired or was revoked');
+    const invalid = error.message.toLowerCase().includes('token is invalid');
     return jsonResponse({
-      error: expired
-        ? 'This invitation has expired or was revoked. Ask an administrator to send a new invitation.'
+      error: invalid
+        ? 'This invitation token is invalid, expired, revoked, or already used. Ask an administrator to send a new invitation.'
         : error.message,
-    }, expired ? 403 : 400, origin);
+    }, invalid ? 403 : 400, origin);
+  }
+  const { data: authUser, error: authUserError } = await adminClient.auth.admin.getUserById(caller.id);
+  if (authUserError || !authUser.user) {
+    return jsonResponse({ error: 'Your invitation was activated, but the token could not be cleared from your account metadata. Contact an administrator.' }, 500, origin);
+  }
+  const userMetadata = { ...authUser.user.user_metadata };
+  delete userMetadata.invitation_token;
+  const { error: metadataError } = await adminClient.auth.admin.updateUserById(caller.id, {
+    user_metadata: userMetadata,
+  });
+  if (metadataError) {
+    return jsonResponse({ error: 'Your invitation was activated, but the token could not be cleared from your account metadata. Contact an administrator.' }, 500, origin);
   }
   return jsonResponse({ success: true }, 200, origin);
 };
@@ -332,25 +440,37 @@ Deno.serve(async (request: Request): Promise<Response> => {
   if (caller instanceof Response) return jsonResponse(await caller.json() as Record<string, unknown>, caller.status, origin);
 
   if (payload.action === 'complete-setup') {
-    return handleCompleteSetup(userClient, origin);
-  }
-
-  const authorizationError = await authorizeSuperAdmin(userClient, adminClient, accessToken, caller);
-  if (authorizationError) {
-    return jsonResponse(await authorizationError.json() as Record<string, unknown>, authorizationError.status, origin);
+    if (typeof payload.invitationToken !== 'string') {
+      return jsonResponse({ error: 'Enter the invitation token from your invitation email.' }, 400, origin);
+    }
+    return handleCompleteSetup(userClient, adminClient, caller, payload.invitationToken, origin);
   }
 
   if (payload.action === 'revoke' && isUuid(payload.invitationId)) {
-    return handleRevoke(payload.invitationId, adminClient, origin);
+    return handleRevoke(payload.invitationId, userClient, adminClient, accessToken, caller, origin);
   }
   if (
     payload.action === 'invite'
     && typeof payload.email === 'string'
     && typeof payload.fullName === 'string'
-    && (payload.role === 'principal' || payload.role === 'regulator')
+    && ['principal', 'regulator', 'admin', 'support', 'auditor'].includes(String(payload.role))
     && isUuid(payload.schoolId)
+    && isUuid(payload.campusId)
   ) {
-    return handleInvite(payload as InviteRequest, caller, adminClient, origin);
+    const inviteRequest = payload as InviteRequest;
+    const authorizationError = await authorizeInvitationManager(
+      userClient,
+      adminClient,
+      accessToken,
+      caller,
+      inviteRequest.schoolId,
+      inviteRequest.campusId,
+      inviteRequest.role,
+    );
+    if (authorizationError) {
+      return jsonResponse(await authorizationError.json() as Record<string, unknown>, authorizationError.status, origin);
+    }
+    return handleInvite(inviteRequest, caller, adminClient, origin);
   }
   return jsonResponse({ error: 'Invalid invitation operation.' }, 400, origin);
 });

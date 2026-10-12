@@ -25,13 +25,16 @@ import {
   X,
   History,
   ChevronLeft,
-  UserCheck
+  UserCheck,
+  Settings
 } from 'lucide-react';
 import { useBellState } from '../context/BellStateContext';
-import { useAuth, MOCK_VILAC_SCHOOL } from '../context/AuthContext';
-import { School, SupportTicket, ScheduleEvent, EventCategory } from '../types/database';
-import { VilacEmblem } from '../components/VilacEmblem';
+import { useAuth } from '../context/AuthContext';
+import { Campus, School, SupportTicket, ScheduleEvent, EventCategory, UserRole } from '../types/database';
+import { SchoolSettingsPanel } from '../components/SchoolSettingsPanel';
+import { SchoolLogo } from '../components/SchoolLogo';
 import { supabase } from '../lib/supabase';
+import { formatCountdown, formatDateTimeInTimeZone, formatTimeInTimeZone, getNextScheduleOccurrence, getPreferredTimeZone, isValidIanaTimeZone } from '../lib/timezone';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -45,15 +48,13 @@ const DAYS = [
   { id: 7, name: 'Sunday', short: 'Sun' },
 ];
 
-type SchoolTab = 'overview' | 'timetable' | 'approvals' | 'device' | 'invitations' | 'audit';
+type SchoolTab = 'overview' | 'timetable' | 'approvals' | 'device' | 'invitations' | 'audit' | 'settings';
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export const SuperAdminDashboard: React.FC = () => {
-  const { user, invitations, refreshInvitations, createInvitation, revokeInvitation } = useAuth();
+  const { user, currentSchool, currentCampus, invitations, refreshInvitations, createInvitation, revokeInvitation } = useAuth();
   const {
-    events,
-    pendingApprovals,
     playbackHistory,
     auditLogs,
     isBellsPaused,
@@ -62,16 +63,9 @@ export const SuperAdminDashboard: React.FC = () => {
     isRingingNow,
     activeRingingEvent,
     lastSyncTime,
-    scheduleRevision,
     // Regulator powers
-    createDraftEvent,
-    updateEventAsDraft,
-    submitEventForApproval,
-    deleteEvent,
     uploadAudioAnnouncement,
     // Principal powers
-    approvePendingItem,
-    rejectPendingItem,
     togglePauseAllBells,
     triggerEmergencyStop,
     resumeFromEmergencyStop,
@@ -95,7 +89,7 @@ export const SuperAdminDashboard: React.FC = () => {
       try {
         const { data, error } = await supabase
           .from('schools')
-          .select('id, name, code, timezone, logo_url, branding_primary, branding_secondary, branding_accent, is_active, created_at, updated_at')
+          .select('id, name, code, timezone, country, region, city, address, default_open_time, default_close_time, logo_url, branding_primary, branding_secondary, branding_accent, is_active, created_at, updated_at')
           .eq('is_active', true)
           .order('name', { ascending: true });
         if (error) throw error;
@@ -199,6 +193,28 @@ export const SuperAdminDashboard: React.FC = () => {
   // ── Navigation state ──
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [activeTab, setActiveTab] = useState<SchoolTab>('overview');
+  const [campuses, setCampuses] = useState<Campus[]>([]);
+  const [selectedCampusId, setSelectedCampusId] = useState('');
+  const [campusLoadError, setCampusLoadError] = useState<string | null>(null);
+  const [scheduleLoadError, setScheduleLoadError] = useState<string | null>(null);
+  const [activeScheduleId, setActiveScheduleId] = useState<string | null>(null);
+  const [activeScheduleRevision, setActiveScheduleRevision] = useState<number | null>(null);
+  const [scheduleEvents, setScheduleEvents] = useState<ScheduleEvent[]>([]);
+  const [isCreateSchoolOpen, setIsCreateSchoolOpen] = useState(false);
+  const [isCreatingSchool, setIsCreatingSchool] = useState(false);
+  const [createSchoolError, setCreateSchoolError] = useState<string | null>(null);
+  const [createSchoolForm, setCreateSchoolForm] = useState({
+    name: '',
+    code: '',
+    country: '',
+    region: '',
+    city: '',
+    address: '',
+    timezone: 'UTC',
+    logo_url: '',
+    default_open_time: '07:00',
+    default_close_time: '16:00',
+  });
 
   // ── Timetable state ──
   const [selectedDay, setSelectedDay] = useState<number>(1);
@@ -219,7 +235,7 @@ export const SuperAdminDashboard: React.FC = () => {
   // ── Invitation state ──
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
-  const [inviteRole, setInviteRole] = useState<'principal' | 'regulator'>('principal');
+  const [inviteRole, setInviteRole] = useState<Exclude<UserRole, 'super_admin'>>('principal');
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteMessage, setInviteMessage] = useState<string | null>(null);
   const [inviteBusy, setInviteBusy] = useState(false);
@@ -230,21 +246,7 @@ export const SuperAdminDashboard: React.FC = () => {
   const [audioSuccess, setAudioSuccess] = useState<string | null>(null);
 
   // ── Support tickets ──
-  const [supportTickets] = useState<SupportTicket[]>([
-    {
-      id: 'tick-1',
-      school_id: MOCK_VILAC_SCHOOL.id,
-      user_id: 'usr-principal',
-      device_id: 'VILAC-HW01',
-      title: 'Aux Cable Grounding Hum on Courtyard Speakers',
-      category: 'Audio Hardware',
-      severity: 'low',
-      status: 'acknowledged',
-      description: 'Minor audio static detected when volume set above 90% during morning assembly.',
-      created_at: 'Yesterday at 14:20',
-      updated_at: 'Today at 08:00',
-    },
-  ]);
+  const [supportTickets] = useState<SupportTicket[]>([]);
 
   // ── Clock for countdown ──
   const [now, setNow] = useState(new Date());
@@ -253,25 +255,165 @@ export const SuperAdminDashboard: React.FC = () => {
     return () => clearInterval(t);
   }, []);
 
-  const liveEvents = events.filter(e => e.approval_status === 'live_on_device' && e.is_enabled);
-  const currentTimeStr = now.toTimeString().substring(0, 5);
+  const selectedCampus = campuses.find(campus => campus.id === selectedCampusId) ?? null;
+  const liveEvents = scheduleEvents.filter(e => e.approval_status === 'live_on_device' && e.is_enabled);
+  const displayTimeZone = getPreferredTimeZone(
+    user?.preferred_timezone,
+    selectedCampusId ? campuses.find(campus => campus.id === selectedCampusId)?.timezone : currentCampus?.timezone,
+    selectedSchool?.timezone ?? currentSchool?.timezone,
+  );
+  const scheduleTimeZone = selectedCampus?.timezone ?? selectedSchool?.timezone ?? displayTimeZone;
   const sortedLive = [...liveEvents].sort((a, b) => a.start_time.localeCompare(b.start_time));
-  const nextBell = sortedLive.find(e => e.start_time > currentTimeStr) || sortedLive[0];
+  const nextBellOccurrence = sortedLive
+    .map(event => ({
+      event,
+      occurrence: getNextScheduleOccurrence(event.start_time, event.days_of_week, scheduleTimeZone, now),
+    }))
+    .filter((item): item is { event: ScheduleEvent; occurrence: Date } => item.occurrence !== null)
+    .sort((a, b) => a.occurrence.getTime() - b.occurrence.getTime())[0];
+  const nextBell = nextBellOccurrence?.event;
 
   const getCountdown = () => {
-    if (!nextBell) return '00:00:00';
-    const [h, m] = nextBell.start_time.split(':').map(Number);
-    const target = new Date(); target.setHours(h, m, 0, 0);
-    let diff = target.getTime() - now.getTime();
-    if (diff < 0) { target.setDate(target.getDate() + 1); diff = target.getTime() - now.getTime(); }
-    const hrs = Math.floor(diff / 3600000);
-    const mins = Math.floor((diff % 3600000) / 60000);
-    const secs = Math.floor((diff % 60000) / 1000);
-    return `${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+    return formatCountdown(nextBellOccurrence?.occurrence ?? null, now);
+  };
+
+  const updateCampusEvent = async (eventId: string, values: Partial<ScheduleEvent>) => {
+    if (!selectedSchool || !selectedCampus || !activeScheduleId) {
+      throw new Error('Select a campus with an active timetable first.');
+    }
+    const { data, error } = await supabase
+      .from('schedule_events')
+      .update(values)
+      .eq('id', eventId)
+      .eq('school_id', selectedSchool.id)
+      .eq('campus_id', selectedCampus.id)
+      .eq('schedule_id', activeScheduleId)
+      .select('*')
+      .single();
+    if (error) throw error;
+    setScheduleEvents(previous => previous.map(event => event.id === eventId ? data as ScheduleEvent : event));
+    setActiveScheduleRevision(previous => previous === null ? null : previous + 1);
+  };
+
+  const submitCampusEvent = (eventId: string) => {
+    void updateCampusEvent(eventId, { approval_status: 'awaiting_principal' })
+      .catch(error => setScheduleLoadError(error instanceof Error ? error.message : 'Unable to submit this event.'));
+  };
+
+  const approveCampusEvent = (eventId: string) => {
+    void updateCampusEvent(eventId, { approval_status: 'live_on_device' })
+      .catch(error => setScheduleLoadError(error instanceof Error ? error.message : 'Unable to approve this event.'));
+  };
+
+  const rejectCampusEvent = (eventId: string, reason: string) => {
+    void updateCampusEvent(eventId, {
+      approval_status: 'draft',
+      change_summary: reason,
+    }).catch(error => setScheduleLoadError(error instanceof Error ? error.message : 'Unable to return this event to draft.'));
+  };
+
+  const removeCampusEvent = (eventId: string) => {
+    if (!selectedSchool || !selectedCampus || !activeScheduleId) return;
+    const remove = async () => {
+      const { data, error } = await supabase
+        .from('schedule_events')
+        .delete()
+        .eq('id', eventId)
+        .eq('school_id', selectedSchool.id)
+        .eq('campus_id', selectedCampus.id)
+        .eq('schedule_id', activeScheduleId)
+        .select('id')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error('The event was not deleted; check your access to this campus.');
+      setScheduleEvents(previous => previous.filter(event => event.id !== eventId));
+      setActiveScheduleRevision(previous => previous === null ? null : previous + 1);
+    };
+    void remove().catch(error => setScheduleLoadError(error instanceof Error ? error.message : 'Unable to delete this event.'));
   };
 
   // ── Helpers ──
-  const isVilac = (s: School) => s.id === MOCK_VILAC_SCHOOL.id;
+  useEffect(() => {
+    let active = true;
+    if (!selectedSchool) {
+      setCampuses([]);
+      setSelectedCampusId('');
+      setCampusLoadError(null);
+      return;
+    }
+    void supabase
+      .from('campuses')
+      .select('id, school_id, name, country, region, city, address, timezone, logo_url, default_open_time, default_close_time, settings, is_default, is_active, created_at, updated_at')
+      .eq('school_id', selectedSchool.id)
+      .eq('is_active', true)
+      .order('is_default', { ascending: false })
+      .order('name', { ascending: true })
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) {
+          setCampusLoadError(error.message);
+          return;
+        }
+        const nextCampuses = data ?? [];
+        setCampuses(nextCampuses);
+        setSelectedCampusId(current => nextCampuses.some(campus => campus.id === current)
+          ? current
+          : nextCampuses[0]?.id ?? '');
+      });
+    return () => { active = false; };
+  }, [selectedSchool]);
+
+  useEffect(() => {
+    let active = true;
+    if (!selectedSchool || !selectedCampus) {
+      setScheduleEvents([]);
+      setActiveScheduleId(null);
+      setActiveScheduleRevision(null);
+      setScheduleLoadError(null);
+      return;
+    }
+
+    setScheduleEvents([]);
+    setActiveScheduleId(null);
+    setActiveScheduleRevision(null);
+    setScheduleLoadError(null);
+    const loadCampusSchedule = async () => {
+      const { data: schedule, error: scheduleError } = await supabase
+        .from('schedules')
+        .select('id, revision')
+        .eq('school_id', selectedSchool.id)
+        .eq('campus_id', selectedCampus.id)
+        .eq('is_active', true)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (scheduleError) throw scheduleError;
+      if (!active) return;
+      if (!schedule) {
+        setScheduleEvents([]);
+        setActiveScheduleId(null);
+        setActiveScheduleRevision(null);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('schedule_events')
+        .select('*')
+        .eq('school_id', selectedSchool.id)
+        .eq('campus_id', selectedCampus.id)
+        .eq('schedule_id', schedule.id)
+        .order('start_time', { ascending: true });
+      if (error) throw error;
+      if (!active) return;
+      setActiveScheduleId(schedule.id);
+      setActiveScheduleRevision(schedule.revision);
+      setScheduleEvents((data || []) as ScheduleEvent[]);
+    };
+    void loadCampusSchedule().catch(error => {
+      if (active) setScheduleLoadError(error instanceof Error ? error.message : 'Unable to load this campus timetable.');
+    });
+    return () => { active = false; };
+  }, [selectedCampus?.id, selectedSchool?.id]);
 
   const handleIssueInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -280,10 +422,11 @@ export const SuperAdminDashboard: React.FC = () => {
     setInviteMessage(null);
     setInviteBusy(true);
     try {
-      await createInvitation(inviteEmail.trim(), inviteName.trim(), inviteRole, selectedSchool.id);
+      if (!selectedCampus) throw new Error('Select a campus for this invitation.');
+      await createInvitation(inviteEmail.trim(), inviteName.trim(), inviteRole, selectedSchool.id, selectedCampus.id);
       setInviteEmail('');
       setInviteName('');
-      setInviteMessage('Invitation created. Supabase accepted the email request; verify delivery because development SMTP may restrict recipients.');
+      setInviteMessage('Invitation created. The invitation email includes its one-time token. Confirm that your Supabase invite email template includes the invitation_token field.');
     } catch (error) {
       setInviteError(error instanceof Error ? error.message : 'Unable to send the invitation.');
     } finally {
@@ -302,7 +445,74 @@ export const SuperAdminDashboard: React.FC = () => {
     }
   };
 
+  const handleCampusesUpdated = useCallback((updatedCampuses: Campus[]) => {
+    setCampuses(updatedCampuses);
+    setSelectedCampusId(current => updatedCampuses.some(campus => campus.id === current)
+      ? current
+      : updatedCampuses[0]?.id ?? '');
+  }, []);
+
+  const handleCreateSchool = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setCreateSchoolError(null);
+    const timezone = createSchoolForm.timezone.trim();
+    if (!isValidIanaTimeZone(timezone)) {
+      setCreateSchoolError('Enter a valid IANA time zone, such as Europe/London.');
+      return;
+    }
+    if (!createSchoolForm.name.trim() || !createSchoolForm.code.trim() || !createSchoolForm.country.trim()) {
+      setCreateSchoolError('School name, code, and country are required.');
+      return;
+    }
+    setIsCreatingSchool(true);
+    try {
+      const { data, error } = await supabase
+        .from('schools')
+        .insert({
+          name: createSchoolForm.name.trim(),
+          code: createSchoolForm.code.trim().toUpperCase(),
+          country: createSchoolForm.country.trim(),
+          region: createSchoolForm.region.trim() || null,
+          city: createSchoolForm.city.trim() || null,
+          address: createSchoolForm.address.trim() || null,
+          timezone,
+          logo_url: createSchoolForm.logo_url.trim() || null,
+          default_open_time: createSchoolForm.default_open_time,
+          default_close_time: createSchoolForm.default_close_time,
+          branding_primary: '#0A1B45',
+          branding_secondary: '#087F9B',
+          branding_accent: '#12C8E8',
+        })
+        .select('id, name, code, timezone, country, region, city, address, default_open_time, default_close_time, logo_url, branding_primary, branding_secondary, branding_accent, is_active, created_at, updated_at')
+        .single();
+      if (error) throw error;
+      setSchools(current => [...current, data].sort((left, right) => left.name.localeCompare(right.name)));
+      setCreateSchoolForm({
+        name: '',
+        code: '',
+        country: '',
+        region: '',
+        city: '',
+        address: '',
+        timezone: 'UTC',
+        logo_url: '',
+        default_open_time: '07:00',
+        default_close_time: '16:00',
+      });
+      setIsCreateSchoolOpen(false);
+      setInviteMessage('School created with a main campus and a separate timetable.');
+    } catch (error) {
+      setCreateSchoolError(error instanceof Error ? error.message : 'Unable to create the school.');
+    } finally {
+      setIsCreatingSchool(false);
+    }
+  };
+
   const openAddModal = () => {
+    if (!selectedSchool || !selectedCampus || !activeScheduleId) {
+      setScheduleLoadError('An active timetable is not available for this campus yet.');
+      return;
+    }
     setEditingEventId(null);
     setFormName(''); setFormCategory('lesson_change'); setFormTime('09:00');
     setFormDays([1,2,3,4,5,6,7]); setFormAnnouncement(''); setFormRepeatCount(3); setFormVolume(100);
@@ -319,25 +529,43 @@ export const SuperAdminDashboard: React.FC = () => {
 
   const saveEvent = (submitNow = false) => {
     if (!formName.trim() || !formTime.trim()) return;
-    if (editingEventId) {
-      updateEventAsDraft(editingEventId, {
-        event_name: formName, category: formCategory, start_time: formTime,
-        days_of_week: formDays, announcement_text: formAnnouncement,
-        repeat_count: formRepeatCount, volume: formVolume,
-        change_summary: `Edited by Super Admin at ${formTime}`,
-      });
-      if (submitNow) submitEventForApproval(editingEventId);
-    } else {
-      createDraftEvent({
-        schedule_id: 'sched-vilac-1',
-        school_id: selectedSchool?.id || MOCK_VILAC_SCHOOL.id,
-        event_name: formName, category: formCategory, start_time: formTime,
-        days_of_week: formDays, is_enabled: true, announcement_text: formAnnouncement,
-        language: 'en', volume: formVolume, repeat_count: formRepeatCount,
-        change_summary: 'Created by Super Admin', last_edited_by: user?.full_name || 'Super Admin',
-      });
+    if (!selectedSchool || !selectedCampus || !activeScheduleId) {
+      setScheduleLoadError('An active timetable is not available for this campus yet.');
+      return;
     }
-    setIsAddModalOpen(false);
+    const save = async () => {
+      const values = {
+        ...(editingEventId ? { id: editingEventId } : {}),
+        schedule_id: activeScheduleId,
+        school_id: selectedSchool.id,
+        campus_id: selectedCampus.id,
+        event_name: formName.trim(),
+        category: formCategory,
+        start_time: formTime,
+        days_of_week: formDays,
+        is_enabled: true,
+        announcement_text: formAnnouncement,
+        language: 'en',
+        volume: formVolume,
+        repeat_count: formRepeatCount,
+        approval_status: submitNow ? 'awaiting_principal' : 'draft',
+        change_summary: editingEventId ? `Edited by ${user?.full_name || 'Super Admin'}` : 'Created by Super Admin',
+        last_edited_by: user?.full_name || 'Super Admin',
+      };
+      const { data, error } = await supabase
+        .from('schedule_events')
+        .upsert(values)
+        .select('*')
+        .single();
+      if (error) throw error;
+      if (!data) throw new Error('The timetable event was not returned after saving.');
+      setScheduleEvents(previous => [...previous.filter(event => event.id !== data.id), data as ScheduleEvent]
+        .sort((left, right) => left.start_time.localeCompare(right.start_time)));
+      setActiveScheduleRevision(previous => previous === null ? null : previous + 1);
+      setIsAddModalOpen(false);
+      setScheduleLoadError(null);
+    };
+    void save().catch(error => setScheduleLoadError(error instanceof Error ? error.message : 'Unable to save this timetable event.'));
   };
 
   const handleAudioUpload = (e: React.FormEvent) => {
@@ -350,8 +578,9 @@ export const SuperAdminDashboard: React.FC = () => {
   };
 
   // ── BADGE COUNTS ──
-  const pendingCount = pendingApprovals.length;
-  const draftCount   = events.filter(e => e.approval_status === 'draft').length;
+  const pendingScheduleEvents = scheduleEvents.filter(event => event.approval_status === 'awaiting_principal');
+  const pendingCount = pendingScheduleEvents.length;
+  const draftCount   = scheduleEvents.filter(e => e.approval_status === 'draft').length;
   const liveCount    = liveEvents.length;
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -362,14 +591,24 @@ export const SuperAdminDashboard: React.FC = () => {
       <div className="space-y-6">
         {/* Header */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-          <div className="flex items-center space-x-2 text-[#12C8E8] text-xs font-bold mb-1">
-            <Shield className="w-4 h-4" />
-            <span className="uppercase tracking-wider">Super Admin — Platform Governance</span>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="flex items-center space-x-2 text-[#12C8E8] text-xs font-bold mb-1">
+                <Shield className="w-4 h-4" />
+                <span className="uppercase tracking-wider">Super Admin — Platform Governance</span>
+              </div>
+              <h1 className="text-2xl font-black text-white">Manage schools</h1>
+              <p className="text-xs text-slate-400 mt-1">
+                Configure schools worldwide, including each school’s time zone, operating hours, and campuses.
+              </p>
+            </div>
+            <button
+              onClick={() => { setCreateSchoolError(null); setIsCreateSchoolOpen(true); }}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-cyan-600"
+            >
+              <Plus className="h-4 w-4" /> Add school
+            </button>
           </div>
-          <h1 className="text-2xl font-black text-white">Select a School to Manage</h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Click any school card below to enter its full workspace. You have unrestricted access to all roles — Principal, Schedule Regulator, and platform settings — inside every school.
-          </p>
         </div>
 
         {/* Platform-wide metrics */}
@@ -419,11 +658,11 @@ export const SuperAdminDashboard: React.FC = () => {
                   : syncStatus === 'error'
                     ? 'Could not refresh shared data'
                     : 'Connecting to live updates…'}
-            {lastDataSyncAt && ` · Last updated ${lastDataSyncAt.toLocaleTimeString()}`}
+            {lastDataSyncAt && ` · Last updated ${formatTimeInTimeZone(lastDataSyncAt, displayTimeZone)} (${displayTimeZone})`}
           </p>
           {!schoolsLoading && !syncError && schools.length === 0 && (
             <p className="rounded-xl border border-slate-800 bg-slate-900 p-4 text-xs text-slate-300">
-              No schools are registered in Supabase yet. School creation is not connected in this phase; register a school in Supabase before issuing invitations.
+              No schools are registered yet. Add a school to create its main campus and timetable.
             </p>
           )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -433,6 +672,7 @@ export const SuperAdminDashboard: React.FC = () => {
                   onClick={() => { setSelectedSchool(school); setActiveTab('overview'); }}
                   className="group w-full text-left space-y-4"
                 >
+                <SchoolLogo school={school} className="h-12 w-12" />
                 {/* School colour swatch + code */}
                 <div className="flex items-center justify-between">
                   <span
@@ -441,11 +681,6 @@ export const SuperAdminDashboard: React.FC = () => {
                   >
                     {school.code}
                   </span>
-                  {isVilac(school) && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
-                      PILOT ACTIVE
-                    </span>
-                  )}
                 </div>
 
                 {/* School name */}
@@ -453,8 +688,70 @@ export const SuperAdminDashboard: React.FC = () => {
                   <h3 className="text-base font-black text-white group-hover:text-[#12C8E8] transition-colors">
                     {school.name}
                   </h3>
-                  <p className="text-[11px] text-slate-400 mt-0.5">{school.timezone}</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {[school.city, school.region, school.country].filter(Boolean).join(', ')} · {school.timezone}
+                  </p>
                 </div>
+
+                {isCreateSchoolOpen && (
+                  <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 p-4">
+                    <form onSubmit={handleCreateSchool} className="max-h-[90vh] w-full max-w-2xl space-y-4 overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-lg font-bold text-white">Register a school</h2>
+                        <button type="button" onClick={() => setIsCreateSchoolOpen(false)} className="p-2 text-slate-400 hover:text-white" aria-label="Close school form"><X className="h-4 w-4" /></button>
+                      </div>
+                      {createSchoolError && <p role="alert" className="rounded-lg border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-200">{createSchoolError}</p>}
+                      <p className="text-xs text-slate-400">The time zone must be an IANA identifier. A main campus and an empty timetable will be created automatically.</p>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {([
+                          ['name', 'School name', true],
+                          ['code', 'School code', true],
+                          ['country', 'Country', true],
+                          ['region', 'Region or state', false],
+                          ['city', 'City or locality', false],
+                          ['timezone', 'IANA time zone', true],
+                          ['address', 'Street address', false],
+                          ['logo_url', 'School logo URL', false],
+                        ] as const).map(([key, label, required]) => (
+                          <label key={key} className="text-xs font-semibold text-slate-300">
+                            {label}
+                            <input
+                              required={required}
+                              type={key === 'logo_url' ? 'url' : 'text'}
+                              placeholder={key === 'timezone' ? 'Europe/London' : ''}
+                              value={createSchoolForm[key]}
+                              onChange={event => setCreateSchoolForm({ ...createSchoolForm, [key]: event.target.value })}
+                              className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-cyan-400 focus:outline-none"
+                            />
+                          </label>
+                        ))}
+                        <label className="text-xs font-semibold text-slate-300">Default opening time ({createSchoolForm.timezone})
+                          <input required type="time" value={createSchoolForm.default_open_time} onChange={event => setCreateSchoolForm({ ...createSchoolForm, default_open_time: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
+                        </label>
+                        <label className="text-xs font-semibold text-slate-300">Default closing time ({createSchoolForm.timezone})
+                          <input required type="time" value={createSchoolForm.default_close_time} onChange={event => setCreateSchoolForm({ ...createSchoolForm, default_close_time: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
+                        </label>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <button type="button" onClick={() => setIsCreateSchoolOpen(false)} className="rounded-lg bg-slate-800 px-4 py-2 text-xs font-bold text-slate-200">Cancel</button>
+                        <button disabled={isCreatingSchool} className="rounded-lg bg-cyan-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-60">
+                          {isCreatingSchool ? 'Creating…' : 'Create school'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+
+                {activeTab === 'settings' && selectedSchool && (
+                  <SchoolSettingsPanel
+                    school={selectedSchool}
+                    onUpdated={updatedSchool => {
+                      setSelectedSchool(updatedSchool);
+                      setSchools(current => current.map(school => school.id === updatedSchool.id ? updatedSchool : school));
+                    }}
+                    onCampusesUpdated={handleCampusesUpdated}
+                  />
+                )}
 
                 {/* Device quick status */}
                 <div className="flex items-center justify-between pt-3 border-t border-slate-800 text-xs">
@@ -480,7 +777,7 @@ export const SuperAdminDashboard: React.FC = () => {
             {auditLogs.slice(0, 5).map((log) => (
               <div key={log.id} className="flex items-center justify-between p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs">
                 <span className="font-semibold text-slate-200">{log.action.replace(/_/g, ' ')}</span>
-                <span className="font-mono text-slate-500">{new Date(log.created_at).toLocaleTimeString()}</span>
+                <span className="font-mono text-slate-500">{formatDateTimeInTimeZone(new Date(log.created_at), displayTimeZone)}</span>
               </div>
             ))}
           </div>
@@ -499,9 +796,10 @@ export const SuperAdminDashboard: React.FC = () => {
     { id: 'timetable',    label: 'Timetable Editor',    icon: Calendar },
     { id: 'invitations',  label: 'Invitations',         icon: Key },
     { id: 'audit',        label: 'Audit Log',           icon: History },
+    { id: 'settings',     label: 'School Settings',     icon: Settings },
   ];
 
-  const dayEvents = events
+  const dayEvents = scheduleEvents
     .filter(e => e.days_of_week.includes(selectedDay))
     .sort((a, b) => a.start_time.localeCompare(b.start_time));
 
@@ -523,19 +821,19 @@ export const SuperAdminDashboard: React.FC = () => {
             <ChevronLeft className="w-4 h-4" />
           </button>
 
-          {isVilac(selectedSchool) && (
-            <VilacEmblem size="sm" className="hidden sm:inline-flex" />
-          )}
+          <SchoolLogo school={selectedSchool} className="hidden h-12 w-12 sm:inline-flex" />
 
           <div>
             <div className="flex items-center space-x-2">
               <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#12C8E8]/15 text-[#12C8E8] border border-[#12C8E8]/30">
                 Super Admin Full Access
               </span>
-              <span className="text-[10px] font-mono text-slate-400">Rev #{scheduleRevision}</span>
+              <span className="text-[10px] font-mono text-slate-400">Rev #{activeScheduleRevision ?? 0}</span>
             </div>
             <h1 className="text-xl font-black text-white mt-0.5">{selectedSchool.name}</h1>
-            <p className="text-[11px] text-slate-400">{selectedSchool.code} &bull; {selectedSchool.timezone}</p>
+            <p className="text-[11px] text-slate-400">
+              {selectedSchool.code} · {[selectedSchool.city, selectedSchool.country].filter(Boolean).join(', ')} · {scheduleTimeZone}
+            </p>
           </div>
         </div>
 
@@ -650,7 +948,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Schedule Rev:</span>
-                  <span className="font-mono text-[#54DDF4]">#{scheduleRevision}</span>
+                  <span className="font-mono text-[#54DDF4]">#{activeScheduleRevision ?? 0}</span>
                 </div>
               </div>
             </div>
@@ -753,38 +1051,34 @@ export const SuperAdminDashboard: React.FC = () => {
               <h2 className="text-sm font-bold text-white">Pending Regulator Submissions</h2>
               <p className="text-xs text-slate-400 mt-0.5">As Super Admin you can approve or reject directly, bypassing the Principal if needed.</p>
             </div>
-            <span className="text-xs font-mono font-bold text-slate-400">{pendingApprovals.length} pending</span>
+            <span className="text-xs font-mono font-bold text-slate-400">{pendingScheduleEvents.length} pending</span>
           </div>
 
-          {pendingApprovals.length === 0 ? (
+          {pendingScheduleEvents.length === 0 ? (
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center space-y-2">
               <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
               <p className="text-sm font-bold text-white">Nothing pending — all changes are live or drafted.</p>
             </div>
           ) : (
-            pendingApprovals.map(item => (
+            pendingScheduleEvents.map(item => (
               <div key={item.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center space-x-3">
                     <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20">
-                      {item.type === 'audio_upload' ? <FileAudio className="w-5 h-5 text-[#12C8E8]" /> : <Calendar className="w-5 h-5 text-[#12C8E8]" />}
+                      <Calendar className="w-5 h-5 text-[#12C8E8]" />
                     </div>
                     <div>
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{item.type.replace(/_/g,' ')} &bull; {item.submitted_at}</div>
-                      <h3 className="text-base font-bold text-white">{item.title}</h3>
-                      <p className="text-xs text-slate-400">By {item.submitted_by_name}</p>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Timetable submission &bull; {formatDateTimeInTimeZone(new Date(item.updated_at || item.created_at), scheduleTimeZone)}
+                      </div>
+                      <h3 className="text-base font-bold text-white">{item.event_name} ({item.start_time})</h3>
+                      <p className="text-xs text-slate-400">By {item.last_edited_by || 'Campus regulator'}</p>
                     </div>
                   </div>
                 </div>
 
                 <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800 text-xs text-slate-300">
-                  {item.description}
-                  {item.type === 'audio_upload' && (
-                    <button onClick={() => playTestChime(item.audio_title)} className="mt-2 flex items-center space-x-2 text-emerald-400 hover:text-emerald-300 font-bold">
-                      <Volume2 className="w-4 h-4" />
-                      <span>Preview Audio</span>
-                    </button>
-                  )}
+                  {item.change_summary || item.announcement_text || 'Review the submitted schedule change.'}
                 </div>
 
                 <div className="flex items-center justify-end space-x-3 pt-1">
@@ -795,7 +1089,7 @@ export const SuperAdminDashboard: React.FC = () => {
                     <X className="w-4 h-4" /><span>Reject</span>
                   </button>
                   <button
-                    onClick={() => approvePendingItem(item.id)}
+                    onClick={() => approveCampusEvent(item.id)}
                     className="px-5 py-2.5 bg-[#0A1B45] hover:bg-[#102A5C] text-white rounded-xl text-xs font-black shadow-lg transition flex items-center space-x-2"
                   >
                     <Check className="w-4 h-4" /><span>Approve & Push to Phone</span>
@@ -821,6 +1115,12 @@ export const SuperAdminDashboard: React.FC = () => {
             </div>
           )}
 
+          {scheduleLoadError && (
+            <div role="alert" className="rounded-lg border border-rose-500/40 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">
+              {scheduleLoadError}
+            </div>
+          )}
+
           {/* Toolbar */}
           <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900 border border-slate-800 rounded-2xl p-4">
             <h2 className="text-sm font-bold text-white">Weekly Timetable — {DAYS.find(d => d.id === selectedDay)?.name}</h2>
@@ -837,7 +1137,7 @@ export const SuperAdminDashboard: React.FC = () => {
           {/* Day tabs */}
           <div className="flex space-x-2 overflow-x-auto">
             {DAYS.map(d => {
-              const cnt = events.filter(e => e.days_of_week.includes(d.id)).length;
+              const cnt = scheduleEvents.filter(e => e.days_of_week.includes(d.id)).length;
               return (
                 <button key={d.id} onClick={() => setSelectedDay(d.id)}
                   className={`flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 ${
@@ -859,7 +1159,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 <div className="flex items-start space-x-4">
                   <div className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-center min-w-[68px]">
                     <span className="text-sm font-black font-mono text-white">{ev.start_time}</span>
-                    <span className="text-[10px] text-slate-400 block">GMT</span>
+                    <span className="text-[10px] text-slate-400 block">{scheduleTimeZone}</span>
                   </div>
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -878,24 +1178,21 @@ export const SuperAdminDashboard: React.FC = () => {
                 <div className="flex items-center space-x-2 self-end md:self-center">
                   <button onClick={() => playTestChime(ev.event_name, ev.announcement_text, ev.repeat_count || 3)} title="Test Play (chime + repeated voice announcement)" className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition"><Play className="w-3.5 h-3.5" /></button>
                   {ev.approval_status === 'draft' && (
-                    <button onClick={() => submitEventForApproval(ev.id)} className="px-3 py-1.5 bg-[#0A1B45] hover:bg-[#102A5C] text-white rounded-lg text-xs font-bold flex items-center space-x-1 transition">
+                    <button onClick={() => submitCampusEvent(ev.id)} className="px-3 py-1.5 bg-[#0A1B45] hover:bg-[#102A5C] text-white rounded-lg text-xs font-bold flex items-center space-x-1 transition">
                       <Send className="w-3.5 h-3.5" /><span>Submit</span>
                     </button>
                   )}
                   {/* Super Admin can also directly approve own drafts */}
                   {ev.approval_status === 'awaiting_principal' && (
                     <button
-                      onClick={() => {
-                        const approval = pendingApprovals.find(p => p.target_event_id === ev.id);
-                        if (approval) approvePendingItem(approval.id);
-                      }}
+                      onClick={() => approveCampusEvent(ev.id)}
                       className="px-3 py-1.5 bg-emerald-900 hover:bg-emerald-700 text-emerald-300 rounded-lg text-xs font-bold flex items-center space-x-1 transition border border-emerald-800"
                     >
                       <Check className="w-3.5 h-3.5" /><span>Approve</span>
                     </button>
                   )}
                   <button onClick={() => openEditModal(ev)} className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition"><Edit3 className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => deleteEvent(ev.id)} className="p-2 bg-slate-800 hover:bg-red-950/40 text-slate-400 hover:text-red-400 rounded-lg border border-slate-700 hover:border-red-800 transition"><Trash2 className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => removeCampusEvent(ev.id)} className="p-2 bg-slate-800 hover:bg-red-950/40 text-slate-400 hover:text-red-400 rounded-lg border border-slate-700 hover:border-red-800 transition"><Trash2 className="w-3.5 h-3.5" /></button>
                 </div>
               </div>
             ))}
@@ -941,32 +1238,37 @@ export const SuperAdminDashboard: React.FC = () => {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
             <div>
               <div className="flex items-center space-x-2 text-[#12C8E8] text-xs font-bold mb-1">
-                <Key className="w-4 h-4" /><span>Super Admin Exclusive</span>
+                <Key className="w-4 h-4" /><span>Invitation Management</span>
               </div>
-              <h3 className="text-base font-bold text-white">Invite Principal or Regulator</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Creates a single-use, one-hour Supabase Auth invitation. Delivery depends on the project email settings.</p>
+              <h3 className="text-base font-bold text-white">Invite an authorised user</h3>
+              <p className="text-xs text-slate-400 mt-0.5">The invitation is linked to one campus, expires after one hour, and can only be activated once.</p>
             </div>
 
             <form onSubmit={handleIssueInvite} className="space-y-4 text-xs">
               <div>
-                <label className="block font-bold text-slate-300 mb-1">Role</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(['principal', 'regulator'] as const).map(r => (
-                    <button key={r} type="button" onClick={() => setInviteRole(r)}
-                      className={`p-3 rounded-xl font-bold text-left border transition ${
-                        inviteRole === r
-                          ? r === 'principal' ? 'bg-emerald-950/80 border-emerald-500 text-white' : 'bg-cyan-950/80 border-cyan-500 text-white'
-                          : 'bg-slate-950 border-slate-800 text-slate-400'
-                      }`}>
-                      <div className={`font-extrabold ${r === 'principal' ? 'text-emerald-400' : 'text-[#12C8E8]'}`}>
-                        {r === 'principal' ? 'Principal' : 'Schedule Regulator'}
-                      </div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">
-                        {r === 'principal' ? 'Oversight, approvals, emergency stop' : 'Timetables, audio, drafts'}
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                <label htmlFor="invite-role" className="block font-bold text-slate-300 mb-1">Role</label>
+                <select id="invite-role" value={inviteRole} onChange={event => setInviteRole(event.target.value as Exclude<UserRole, 'super_admin'>)} className="w-full rounded-xl border border-slate-800 bg-slate-950 p-3 text-white">
+                  <option value="principal">Principal</option>
+                  <option value="regulator">Schedule Regulator</option>
+                  <option value="admin">School Administrator</option>
+                  <option value="support">Support</option>
+                  <option value="auditor">Auditor</option>
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="invite-campus" className="block font-bold text-slate-300 mb-1">Campus</label>
+                <select
+                  id="invite-campus"
+                  required
+                  value={selectedCampusId}
+                  onChange={event => setSelectedCampusId(event.target.value)}
+                  className="w-full rounded-xl border border-slate-800 bg-slate-950 p-3 text-white"
+                >
+                  <option value="">Select a campus</option>
+                  {campuses.map(campus => <option key={campus.id} value={campus.id}>{campus.name} · {campus.timezone}</option>)}
+                </select>
+                {campusLoadError && <p role="alert" className="mt-1 text-rose-300">{campusLoadError}</p>}
               </div>
 
               <div>
@@ -984,7 +1286,7 @@ export const SuperAdminDashboard: React.FC = () => {
                   className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-[#12C8E8]" />
               </div>
 
-              <button type="submit" disabled={inviteBusy} className="w-full py-3 bg-[#12C8E8] hover:bg-[#087F9B] disabled:opacity-60 text-white font-extrabold rounded-xl shadow-lg transition flex items-center justify-center space-x-2">
+              <button type="submit" disabled={inviteBusy || !selectedCampus} className="w-full py-3 bg-[#12C8E8] hover:bg-[#087F9B] disabled:opacity-60 text-white font-extrabold rounded-xl shadow-lg transition flex items-center justify-center space-x-2">
                 <Send className="w-4 h-4" /><span>{inviteBusy ? 'Sending invitation…' : 'Send secure invitation'}</span>
               </button>
             </form>
@@ -1007,14 +1309,16 @@ export const SuperAdminDashboard: React.FC = () => {
                 <div key={inv.id} className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs space-y-1.5">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-white">{inv.email}</span>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                      inv.role === 'principal' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-cyan-950 text-cyan-300 border border-cyan-800'
-                    }`}>{inv.role}</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-cyan-950 text-cyan-300 border border-cyan-800">{inv.role}</span>
                   </div>
                   <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-                    <span>Expires: {new Date(inv.expires_at).toLocaleString()}</span>
+                    <span>Expires: {formatDateTimeInTimeZone(
+                      new Date(inv.expires_at),
+                      campuses.find(campus => campus.id === inv.campus_id)?.timezone ?? selectedSchool.timezone,
+                    )} ({campuses.find(campus => campus.id === inv.campus_id)?.timezone ?? selectedSchool.timezone})</span>
                     <span>{inv.is_used ? 'Activated' : inv.revoked_at ? 'Revoked' : Date.parse(inv.expires_at) <= now.getTime() ? 'Expired' : 'Pending'}</span>
                   </div>
+                  <div className="text-[10px] text-slate-500">Ref {inv.reference} · {campuses.find(campus => campus.id === inv.campus_id)?.name ?? 'Campus'}</div>
                   <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-800/80">
                     <span>{inv.is_used ? 'Account activated' : 'Activation by email'}</span>
                     {!inv.is_used && !inv.revoked_at && (
@@ -1056,7 +1360,7 @@ export const SuperAdminDashboard: React.FC = () => {
                   )}
                 </div>
                 <span className="text-[11px] font-mono text-slate-500 flex-shrink-0 ml-4">
-                  {new Date(log.created_at).toLocaleTimeString()}
+                  {formatDateTimeInTimeZone(new Date(log.created_at), displayTimeZone)} ({displayTimeZone})
                 </span>
               </div>
             ))}
@@ -1097,7 +1401,7 @@ export const SuperAdminDashboard: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-300 mb-1">Start Time</label>
+                  <label className="block font-bold text-slate-300 mb-1">Start Time ({scheduleTimeZone})</label>
                   <input type="time" value={formTime} onChange={e => setFormTime(e.target.value)}
                     className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:outline-none focus:border-[#12C8E8]" />
                 </div>
@@ -1163,7 +1467,7 @@ export const SuperAdminDashboard: React.FC = () => {
               className="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-red-500" />
             <div className="flex justify-end space-x-3 pt-1">
               <button onClick={() => setRejectModalId(null)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl">Cancel</button>
-              <button onClick={() => { rejectPendingItem(rejectModalId, rejectReason || 'Rejected by Super Admin.'); setRejectModalId(null); setRejectReason(''); }}
+              <button onClick={() => { rejectCampusEvent(rejectModalId, rejectReason || 'Rejected by Super Admin.'); setRejectModalId(null); setRejectReason(''); }}
                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl">Confirm Rejection</button>
             </div>
           </div>

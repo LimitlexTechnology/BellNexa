@@ -15,7 +15,11 @@ import {
   Save,
   RotateCw
 } from 'lucide-react';
-import { ScheduleEvent, EventCategory } from '../types/database';
+import { Device, ScheduleEvent, EventCategory } from '../types/database';
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
+import { formatDateTimeInTimeZone, formatTimeInTimeZone, getNextScheduleOccurrence, getPreferredTimeZone } from '../lib/timezone';
+import { SchoolSettingsPanel } from '../components/SchoolSettingsPanel';
 
 const WEEKDAYS = [
   { id: 1, label: 'Mon', short: 'M' },
@@ -28,6 +32,12 @@ const WEEKDAYS = [
 ];
 
 export const SchoolAdminDashboard: React.FC = () => {
+  const { currentSchool, currentCampus, user, setCurrentSchool } = useAuth();
+  const [scheduleId, setScheduleId] = useState<string | null>(null);
+  const [scheduleName, setScheduleName] = useState('');
+  const [scheduleRevision, setScheduleRevision] = useState<number | null>(null);
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState<string>('');
   const [testAudioStatus, setTestAudioStatus] = useState<string | null>(null);
 
@@ -35,116 +45,131 @@ export const SchoolAdminDashboard: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingEvent, setEditingEvent] = useState<Partial<ScheduleEvent> | null>(null);
 
-  // Vilac Initial Seed Events with 3x Repetition Default
-  const [events, setEvents] = useState<ScheduleEvent[]>([
-    {
-      id: 'evt-1',
-      schedule_id: 'sched-1',
-      school_id: '00000000-0000-0000-0000-000000000001',
-      event_name: 'Morning Assembly Bell',
-      category: 'morning_assembly',
-      start_time: '07:30',
-      days_of_week: [1, 2, 3, 4, 5],
-      is_enabled: true,
-      announcement_text: 'Good morning students and staff. Please proceed to the assembly ground for morning devotion.',
-      language: 'en',
-      volume: 100,
-      repeat_count: 3, // Repeat Thrice
-      created_at: new Date().toISOString()
-    },
-    {
-      id: 'evt-2',
-      schedule_id: 'sched-1',
-      school_id: '00000000-0000-0000-0000-000000000001',
-      event_name: 'First Period Commencement',
-      category: 'lesson_commencement',
-      start_time: '08:00',
-      days_of_week: [1, 2, 3, 4, 5],
-      is_enabled: true,
-      announcement_text: 'First period has commenced. All students must be in their respective classrooms.',
-      language: 'en',
-      volume: 100,
-      repeat_count: 3, // Repeat Thrice
-      created_at: new Date().toISOString()
-    },
-    {
-      id: 'evt-3',
-      schedule_id: 'sched-1',
-      school_id: '00000000-0000-0000-0000-000000000001',
-      event_name: 'Snack & Recess Break',
-      category: 'snack_break',
-      start_time: '10:30',
-      days_of_week: [1, 2, 3, 4, 5],
-      is_enabled: true,
-      announcement_text: 'It is now time for morning break and snacks.',
-      language: 'en',
-      volume: 95,
-      repeat_count: 3, // Repeat Thrice
-      created_at: new Date().toISOString()
-    },
-    {
-      id: 'evt-4',
-      schedule_id: 'sched-1',
-      school_id: '00000000-0000-0000-0000-000000000001',
-      event_name: 'Lunch Break Bell',
-      category: 'lunch_break',
-      start_time: '12:30',
-      days_of_week: [1, 2, 3, 4, 5],
-      is_enabled: true,
-      announcement_text: 'Lunch break has commenced. Enjoy your meal.',
-      language: 'en',
-      volume: 100,
-      repeat_count: 3, // Repeat Thrice
-      created_at: new Date().toISOString()
-    },
-    {
-      id: 'evt-5',
-      schedule_id: 'sched-1',
-      school_id: '00000000-0000-0000-0000-000000000001',
-      event_name: 'School Closing Bell',
-      category: 'closing_time',
-      start_time: '15:30',
-      days_of_week: [1, 2, 3, 4, 5],
-      is_enabled: true,
-      announcement_text: 'School has closed for the day. Safe journey home to all students.',
-      language: 'en',
-      volume: 100,
-      repeat_count: 3, // Repeat Thrice
-      created_at: new Date().toISOString()
-    }
-  ]);
+  const [events, setEvents] = useState<ScheduleEvent[]>([]);
+  const scheduleTimeZone = getPreferredTimeZone(
+    user?.preferred_timezone,
+    currentCampus?.timezone,
+    currentSchool?.timezone,
+  );
 
-  // Live Clock Updater
   useEffect(() => {
     const updateClock = () => {
-      const now = new Date();
-      setCurrentTime(now.toLocaleTimeString('en-US', { timeZone: 'Africa/Accra', hour12: false }));
+      setCurrentTime(formatTimeInTimeZone(new Date(), scheduleTimeZone));
     };
     updateClock();
     const interval = setInterval(updateClock, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [scheduleTimeZone]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadSchedule = async () => {
+      if (!currentSchool || !currentCampus) {
+        setEvents([]);
+        setScheduleId(null);
+        setScheduleName('');
+        setScheduleRevision(null);
+        setDevices([]);
+        return;
+      }
+      setLoadError(null);
+      const [{ data: schedule, error: scheduleError }, { data: campusDevices, error: devicesError }] = await Promise.all([
+        supabase
+        .from('schedules')
+        .select('id, name, revision')
+        .eq('school_id', currentSchool.id)
+        .eq('campus_id', currentCampus.id)
+        .eq('is_active', true)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle(),
+        supabase.from('devices')
+          .select('*')
+          .eq('school_id', currentSchool.id)
+          .eq('campus_id', currentCampus.id)
+          .order('device_name', { ascending: true }),
+      ]);
+      if (scheduleError) throw scheduleError;
+      if (devicesError) throw devicesError;
+      if (!cancelled) setDevices((campusDevices || []) as Device[]);
+      if (!schedule) {
+        if (!cancelled) {
+          setEvents([]);
+          setScheduleId(null);
+          setScheduleName('');
+          setScheduleRevision(null);
+        }
+        return;
+      }
+      const { data, error } = await supabase
+        .from('schedule_events')
+        .select('*')
+        .eq('school_id', currentSchool.id)
+        .eq('campus_id', currentCampus.id)
+        .eq('schedule_id', schedule.id)
+        .order('start_time', { ascending: true });
+      if (error) throw error;
+      if (!cancelled) {
+        setScheduleId(schedule.id);
+        setScheduleName(schedule.name);
+        setScheduleRevision(schedule.revision);
+        setEvents((data || []) as ScheduleEvent[]);
+      }
+    };
+    loadSchedule().catch(error => {
+      if (!cancelled) setLoadError(error instanceof Error ? error.message : 'Unable to load this campus schedule.');
+    });
+    return () => { cancelled = true; };
+  }, [currentCampus?.id, currentSchool?.id]);
+
+  const nextEvent = events
+    .map(event => ({
+      event,
+      occurrence: getNextScheduleOccurrence(event.start_time, event.days_of_week, scheduleTimeZone, new Date()),
+    }))
+    .filter((item): item is { event: ScheduleEvent; occurrence: Date } => item.occurrence !== null)
+    .sort((left, right) => left.occurrence.getTime() - right.occurrence.getTime())[0];
+
+  const updateEvent = async (id: string, values: Partial<ScheduleEvent>) => {
+    const { error } = await supabase
+      .from('schedule_events')
+      .update(values)
+      .eq('id', id)
+      .eq('school_id', currentSchool?.id || '')
+      .eq('campus_id', currentCampus?.id || '');
+    if (error) throw error;
+    setEvents(previous => previous.map(event => event.id === id ? { ...event, ...values } : event));
+  };
 
   const handleToggleEvent = (id: string) => {
-    setEvents(events.map(evt => evt.id === id ? { ...evt, is_enabled: !evt.is_enabled } : evt));
+    const event = events.find(item => item.id === id);
+    if (!event) return;
+    updateEvent(id, { is_enabled: !event.is_enabled }).catch(error => {
+      setLoadError(error instanceof Error ? error.message : 'Unable to update this event.');
+    });
   };
 
   const handleToggleDayInline = (eventId: string, dayId: number) => {
-    setEvents(events.map(evt => {
-      if (evt.id !== eventId) return evt;
-      const currentDays = evt.days_of_week || [];
-      const updatedDays = currentDays.includes(dayId)
-        ? currentDays.filter(d => d !== dayId)
-        : [...currentDays, dayId].sort((a, b) => a - b);
-      return { ...evt, days_of_week: updatedDays };
-    }));
+    const event = events.find(item => item.id === eventId);
+    if (!event) return;
+    const days = event.days_of_week || [];
+    const updatedDays = days.includes(dayId)
+      ? days.filter(day => day !== dayId)
+      : [...days, dayId].sort((left, right) => left - right);
+    updateEvent(eventId, { days_of_week: updatedDays }).catch(error => {
+      setLoadError(error instanceof Error ? error.message : 'Unable to update the event days.');
+    });
   };
 
   const handleOpenAddModal = () => {
+    if (!currentSchool || !currentCampus || !scheduleId) {
+      setLoadError('A campus timetable is not available yet. Refresh the page or contact an administrator.');
+      return;
+    }
     setEditingEvent({
-      id: `evt-${Date.now()}`,
-      schedule_id: 'sched-1',
-      school_id: '00000000-0000-0000-0000-000000000001',
+      schedule_id: scheduleId,
+      school_id: currentSchool.id,
+      campus_id: currentCampus.id,
       event_name: '',
       category: 'custom',
       start_time: '09:00',
@@ -153,8 +178,9 @@ export const SchoolAdminDashboard: React.FC = () => {
       announcement_text: '',
       language: 'en',
       volume: 100,
-      repeat_count: 3, // Default thrice
+      repeat_count: 3,
     });
+    setLoadError(null);
     setIsModalOpen(true);
   };
 
@@ -165,24 +191,60 @@ export const SchoolAdminDashboard: React.FC = () => {
 
   const handleSaveModal = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingEvent || !editingEvent.event_name || !editingEvent.start_time) return;
-
-    const existingIndex = events.findIndex(e => e.id === editingEvent.id);
-    if (existingIndex >= 0) {
-      const updated = [...events];
-      updated[existingIndex] = editingEvent as ScheduleEvent;
-      setEvents(updated);
-    } else {
-      setEvents([...events, editingEvent as ScheduleEvent]);
-    }
-    setIsModalOpen(false);
-    setEditingEvent(null);
+    if (!editingEvent || !editingEvent.event_name?.trim() || !editingEvent.start_time
+      || !currentSchool || !currentCampus || !scheduleId) return;
+    const values = {
+      ...(editingEvent.id ? { id: editingEvent.id } : {}),
+      schedule_id: scheduleId,
+      school_id: currentSchool.id,
+      campus_id: currentCampus.id,
+      event_name: editingEvent.event_name.trim(),
+      category: editingEvent.category || 'custom',
+      start_time: editingEvent.start_time,
+      days_of_week: editingEvent.days_of_week || [],
+      is_enabled: editingEvent.is_enabled ?? true,
+      announcement_text: editingEvent.announcement_text || '',
+      language: editingEvent.language || 'en',
+      volume: editingEvent.volume ?? 100,
+      repeat_count: editingEvent.repeat_count ?? 3,
+    };
+    const saveEvent = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('schedule_events')
+          .upsert(values)
+          .select('*')
+          .single();
+        if (error) throw error;
+        if (!data) throw new Error('The saved event was not returned by the database.');
+        setEvents(previous => [...previous.filter(event => event.id !== data.id), data as ScheduleEvent]
+          .sort((left, right) => left.start_time.localeCompare(right.start_time)));
+        setIsModalOpen(false);
+        setEditingEvent(null);
+        setLoadError(null);
+      } catch (error) {
+        setLoadError(error instanceof Error ? error.message : 'Unable to save this event.');
+      }
+    };
+    void saveEvent();
   };
 
   const handleDeleteEvent = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this scheduled bell event?')) {
-      setEvents(events.filter(e => e.id !== id));
-    }
+    if (!window.confirm('Are you sure you want to delete this scheduled bell event?')) return;
+    const removeEvent = async () => {
+      try {
+        const { error } = await supabase.from('schedule_events')
+          .delete()
+          .eq('id', id)
+          .eq('school_id', currentSchool?.id || '')
+          .eq('campus_id', currentCampus?.id || '');
+        if (error) throw error;
+        setEvents(previous => previous.filter(event => event.id !== id));
+      } catch (error) {
+        setLoadError(error instanceof Error ? error.message : 'Unable to delete this event.');
+      }
+    };
+    void removeEvent();
   };
 
   // Repeats speech playback THRICE (or repeat_count times)
@@ -226,113 +288,85 @@ export const SchoolAdminDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6 relative">
-      {/* Vilac Header Banner */}
+      {currentSchool && (
+        <SchoolSettingsPanel
+          school={currentSchool}
+          onUpdated={setCurrentSchool}
+        />
+      )}
+
+      {loadError && (
+        <div role="alert" className="rounded-lg border border-rose-500/40 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">
+          {loadError}
+        </div>
+      )}
+
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-6 rounded-2xl bg-gradient-to-r from-bellnexa-navyDark via-slate-900 to-slate-900 border border-bellnexa-navy/30 shadow-2xl relative overflow-hidden">
         <div className="absolute right-0 top-0 bottom-0 w-64 bg-gradient-to-l from-bellnexa-cyan/10 to-transparent pointer-events-none" />
         <div className="space-y-1 relative z-10">
           <div className="flex items-center space-x-2">
             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-bellnexa-cyanBright/20 text-bellnexa-cyanBright border border-bellnexa-cyanBright/30">
-              VILAC PILOT ACTIVE
+              {currentSchool?.country || 'School'} &bull; {currentCampus?.name || 'No campus selected'}
             </span>
-            <span className="text-xs text-slate-400 font-mono">Timezone: Africa/Accra (GMT+0)</span>
+            <span className="text-xs text-slate-400 font-mono">Schedule time zone: {scheduleTimeZone}</span>
           </div>
           <h2 className="text-2xl font-extrabold text-white tracking-tight flex items-center space-x-2">
-            <span>Vilac International School Bell Dashboard</span>
+            <span>{currentSchool?.name || 'School'} Bell Dashboard</span>
           </h2>
           <p className="text-xs text-slate-300">
-            Configure exact alarm times, spoken announcement text, 3x repetition rules, and specific day toggles.
+            Manage the {currentCampus?.name || 'selected campus'} timetable. Schedule times use {scheduleTimeZone}.
           </p>
         </div>
 
-        {/* Live Clock & Next Bell Status */}
         <div className="flex items-center space-x-4 bg-slate-950/80 p-3 rounded-xl border border-slate-800 relative z-10">
           <div className="text-right">
-            <div className="text-[10px] uppercase font-mono text-slate-400">Accra School Local Time</div>
-            <div className="text-xl font-mono font-bold text-bellnexa-cyanBright">{currentTime || '12:45:00'}</div>
+            <div className="text-[10px] uppercase font-mono text-slate-400">Campus local time</div>
+            <div className="text-xl font-mono font-bold text-bellnexa-cyanBright">{currentTime || '--:--:--'}</div>
           </div>
           <div className="w-px h-8 bg-slate-800" />
           <div>
             <div className="text-[10px] uppercase font-mono text-slate-400">Next Scheduled Bell</div>
             <div className="text-xs font-bold text-emerald-400 flex items-center space-x-1">
               <Clock className="w-3.5 h-3.5" />
-              <span>15:30 (Closing Bell &bull; 3x Repeat)</span>
+              <span>
+                {nextEvent
+                  ? `${formatTimeInTimeZone(nextEvent.occurrence, scheduleTimeZone)} (${nextEvent.event.event_name})`
+                  : 'No upcoming scheduled events'}
+              </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Device Connection Health & Offline Revision Card */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Device Status */}
-        <div className="glass-card p-4 rounded-xl space-y-2 border border-emerald-500/20">
-          <div className="flex justify-between items-center text-xs">
-            <span className="font-semibold text-slate-300 flex items-center">
-              <Smartphone className="w-4 h-4 text-emerald-400 mr-1.5" /> Dedicated Android Device
-            </span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-              ONLINE
-            </span>
-          </div>
-          <div className="text-xs text-slate-400 space-y-1">
-            <div className="flex justify-between">
-              <span>Hardware ID:</span>
-              <span className="font-mono text-white">VILAC-HW-01</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Battery Level:</span>
-              <span className="font-semibold text-emerald-400">98% (Charging)</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Audio Route:</span>
-              <span className="text-bellnexa-cyanBright font-medium">Bluetooth Speaker Connected</span>
-            </div>
-          </div>
+      <section className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-white">Devices at {currentCampus?.name || 'this campus'}</h3>
+          <span className="text-xs text-slate-400">
+            {scheduleName ? `${scheduleName}${scheduleRevision ? ` · revision ${scheduleRevision}` : ''}` : 'No active timetable'}
+          </span>
         </div>
-
-        {/* Local Offline Sync Engine */}
-        <div className="glass-card p-4 rounded-xl space-y-2 border border-slate-700">
-          <div className="flex justify-between items-center text-xs">
-            <span className="font-semibold text-slate-300 flex items-center">
-              <RefreshCw className="w-4 h-4 text-bellnexa-cyan mr-1.5" /> Offline Sync Revision
-            </span>
-            <span className="text-[10px] font-mono text-slate-400">Revision #1</span>
+        {devices.length === 0 ? (
+          <p className="text-xs text-slate-400">No devices are registered for this campus.</p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {devices.map(device => (
+              <div key={device.id} className="rounded-xl border border-slate-700 bg-slate-900/60 p-3 text-xs">
+                <div className="flex items-center justify-between text-white">
+                  <span className="font-semibold">{device.device_name}</span>
+                  <span className={device.is_online ? 'text-emerald-400' : 'text-slate-400'}>
+                    {device.is_online ? 'Online' : 'Offline'}
+                  </span>
+                </div>
+                <p className="mt-1 font-mono text-slate-400">{device.device_hardware_id}</p>
+                <p className="mt-1 text-slate-400">
+                  {device.battery_level == null ? 'Battery unknown' : `Battery ${device.battery_level}%`}
+                  {device.last_checkin_at ? ` · Last check-in ${formatDateTimeInTimeZone(new Date(device.last_checkin_at), scheduleTimeZone)}` : ''}
+                </p>
+              </div>
+            ))}
           </div>
-          <div className="text-xs text-slate-400 space-y-1">
-            <div className="flex justify-between">
-              <span>Applied Timetable:</span>
-              <span className="text-white font-medium">Standard Daily Timetable</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Announcement Repeat:</span>
-              <span className="text-emerald-400 font-semibold">Thrice (3x Loop Enabled)</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Screen Lock Readiness:</span>
-              <span className="text-white font-medium">Exact Alarm Granted</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Emergency Manual Trigger */}
-        <div className="glass-card p-4 rounded-xl space-y-2 border border-bellnexa-cyan/30 bg-gradient-to-b from-slate-900 to-bellnexa-cyan/10 flex flex-col justify-between">
-          <div>
-            <div className="text-xs font-bold text-white flex items-center space-x-1">
-              <ShieldAlert className="w-4 h-4 text-bellnexa-cyan" />
-              <span>Manual Emergency Override</span>
-            </div>
-            <p className="text-[11px] text-slate-400 mt-1">
-              Trigger instant emergency announcement (Repeats 3x across Bluetooth speaker).
-            </p>
-          </div>
-          <button
-            onClick={() => handleTestAudio('Emergency Bell Alert', 'Emergency announcement. All teachers and students please remain calm and follow safety protocols.', 3)}
-            className="w-full bg-bellnexa-cyan hover:bg-cyan-600 text-white font-bold py-2 rounded-lg text-xs flex items-center justify-center space-x-1.5 shadow-lg shadow-bellnexa-cyan/30 transition"
-          >
-            <Volume2 className="w-4 h-4" />
-            <span>Trigger Emergency Announcement (3x)</span>
-          </button>
-        </div>
-      </div>
+        )}
+      </section>
 
       {/* Audio Playback Test Banner */}
       {testAudioStatus && (
@@ -373,7 +407,7 @@ export const SchoolAdminDashboard: React.FC = () => {
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-slate-800 text-slate-400 font-mono text-[10px] uppercase">
-                <th className="py-2.5 px-3">Time (GMT)</th>
+                <th className="py-2.5 px-3">Time ({scheduleTimeZone})</th>
                 <th className="py-2.5 px-3">Event Name & Category</th>
                 <th className="py-2.5 px-3">Spoken Announcement Text</th>
                 <th className="py-2.5 px-3">Repeat Rule</th>
@@ -517,7 +551,7 @@ export const SchoolAdminDashboard: React.FC = () => {
               {/* Time, Category & Repetition Rule */}
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Alarm Time (HH:mm)</label>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Alarm Time ({scheduleTimeZone})</label>
                   <input
                     type="time"
                     required

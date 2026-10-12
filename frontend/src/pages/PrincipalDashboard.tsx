@@ -16,10 +16,11 @@ import {
 } from 'lucide-react';
 import { useBellState } from '../context/BellStateContext';
 import { useAuth } from '../context/AuthContext';
-import { VilacEmblem } from '../components/VilacEmblem';
+import { SchoolLogo } from '../components/SchoolLogo';
+import { formatCountdown, formatDateTimeInTimeZone, getNextScheduleOccurrence, getPreferredTimeZone } from '../lib/timezone';
 
 export const PrincipalDashboard: React.FC = () => {
-  const { user, currentSchool } = useAuth();
+  const { user, currentSchool, currentCampus } = useAuth();
   const { 
     events, 
     pendingApprovals, 
@@ -53,32 +54,21 @@ export const PrincipalDashboard: React.FC = () => {
   const liveEvents = events.filter(e => e.approval_status === 'live_on_device' && e.is_enabled);
   
   // Find next upcoming bell for today
-  const currentTimeString = now.toTimeString().substring(0, 5); // HH:mm
   const sortedLiveEvents = [...liveEvents].sort((a, b) => a.start_time.localeCompare(b.start_time));
-  
-  // Find first event later than current time, or wrap to tomorrow morning's first bell
-  const upcomingEvent = sortedLiveEvents.find(e => e.start_time > currentTimeString) || sortedLiveEvents[0];
-
-  // Calculate countdown string (approximate based on upcomingEvent start_time)
-  const calculateCountdown = () => {
-    if (!upcomingEvent) return '00:00:00';
-    const [targetH, targetM] = upcomingEvent.start_time.split(':').map(Number);
-    const targetDate = new Date();
-    targetDate.setHours(targetH, targetM, 0, 0);
-
-    let diffMs = targetDate.getTime() - now.getTime();
-    if (diffMs < 0) {
-      // wraps to next day
-      targetDate.setDate(targetDate.getDate() + 1);
-      diffMs = targetDate.getTime() - now.getTime();
-    }
-
-    const hours = Math.floor(diffMs / 3600000);
-    const mins = Math.floor((diffMs % 3600000) / 60000);
-    const secs = Math.floor((diffMs % 60000) / 1000);
-
-    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  };
+  const scheduleTimeZone = getPreferredTimeZone(
+    user?.preferred_timezone,
+    currentCampus?.timezone,
+    currentSchool?.timezone,
+  );
+  const upcomingOccurrence = sortedLiveEvents
+    .map(event => ({
+      event,
+      occurrence: getNextScheduleOccurrence(event.start_time, event.days_of_week, scheduleTimeZone, now),
+    }))
+    .filter((item): item is { event: typeof sortedLiveEvents[number]; occurrence: Date } => item.occurrence !== null)
+    .sort((left, right) => left.occurrence.getTime() - right.occurrence.getTime())[0];
+  const upcomingEvent = upcomingOccurrence?.event;
+  const calculateCountdown = () => formatCountdown(upcomingOccurrence?.occurrence ?? null, now);
 
   const handleConfirmReject = () => {
     if (rejectModalId) {
@@ -135,7 +125,7 @@ export const PrincipalDashboard: React.FC = () => {
       {/* TOP HEADER: INSTITUTION OVERSIGHT IDENTITY & CONTROLS */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
         <div className="flex items-center space-x-4">
-          <VilacEmblem size="md" className="hidden sm:inline-flex" />
+          {currentSchool && <SchoolLogo school={currentSchool} className="hidden h-10 w-10 sm:inline-flex" />}
           <div>
             <div className="flex items-center space-x-2">
               <span className="text-xs font-bold uppercase tracking-wider text-[#54DDF4] bg-amber-950/40 border border-amber-800/60 px-2 py-0.5 rounded">
@@ -455,8 +445,8 @@ export const PrincipalDashboard: React.FC = () => {
               </div>
 
               <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-                <span className="text-slate-400">Zone: Africa/Accra</span>
-                <span className="text-slate-300">GMT (UTC+0)</span>
+                <span className="text-slate-400">Zone: {scheduleTimeZone}</span>
+                <span className="text-slate-300">{scheduleTimeZone}</span>
               </div>
             </div>
 
@@ -489,7 +479,7 @@ export const PrincipalDashboard: React.FC = () => {
                         {log.action.replace(/_/g, ' ')}
                       </span>
                       <span className="font-mono text-[10px] text-slate-500">
-                        {new Date(log.created_at).toLocaleTimeString()}
+                        {formatDateTimeInTimeZone(new Date(log.created_at), scheduleTimeZone)}
                       </span>
                     </div>
                     {log.metadata && (
@@ -568,7 +558,7 @@ export const PrincipalDashboard: React.FC = () => {
                     <span className="text-slate-500 ml-2 text-[11px]">({log.resource_type})</span>
                   </div>
                   <span className="text-[11px] font-mono text-slate-400">
-                    {new Date(log.created_at).toLocaleString()}
+                    {formatDateTimeInTimeZone(new Date(log.created_at), scheduleTimeZone)}
                   </span>
                 </div>
               ))}
