@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "deploy:pages": "wrangler pages deploy dist",
+    "deploy:pages": "npm run build && wrangler pages deploy dist --project-name bellnexa",
+    "deploy:worker": "npm run build && wrangler deploy",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },

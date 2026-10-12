@@ -21,7 +21,13 @@ The repository changes do not automatically update a deployed Supabase project. 
 5. Confirm the Edge Function has the Supabase URL, publishable/anon key, and server-side secret key supplied by the Supabase runtime. Never add the server-side secret to Vite variables or browser code.
 6. Confirm at least one real, active school record exists. The current Super Admin page reads schools from Supabase; creating/editing schools is a later implementation phase.
 
-The repository currently has no Supabase project credentials/configuration, so the migration and function have not been applied to the hosted project.
+Local frontend connection settings do not confirm that backend migrations or Edge Functions have been applied. A project owner must verify the hosted database and function deployment separately.
+
+## Frontend Supabase environment
+
+The frontend's ignored `frontend/.env.local` supplies `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. The latter may contain a Supabase publishable key (`sb_publishable_...`); publishable keys are intended for browser use and are constrained by the project's RLS policies. Never put a Supabase secret or service-role key in a `VITE_` variable.
+
+Vite embeds these values when building the frontend. The `deploy:pages` and `deploy:worker` scripts build before uploading, so run the appropriate script from `frontend/` after changing local environment values. If Cloudflare builds from the repository instead, configure both `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in that build environment and use `frontend` as the project root, `npm run build` as the build command, and `dist` as the output directory.
 
 This change covers the Phase 3 invitation and account-activation path only. International school/campus fields and campus-scoped permissions (Phase 4), plus persistent school/user management and Super Admin profile-photo storage (Phase 5), are not implemented here.
 
