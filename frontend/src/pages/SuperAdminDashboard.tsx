@@ -837,6 +837,21 @@ export const SuperAdminDashboard: React.FC = () => {
           </div>
         </div>
 
+        <div className="flex items-center gap-2 flex-wrap">
+          <label htmlFor="school-campus-switcher" className="text-[10px] uppercase tracking-wider text-slate-400">Campus</label>
+          <select
+            id="school-campus-switcher"
+            value={selectedCampusId}
+            onChange={event => setSelectedCampusId(event.target.value)}
+            className="max-w-56 bg-slate-800 text-xs text-white border border-slate-700 rounded-lg px-2 py-2"
+          >
+            {campuses.length === 0 && <option value="">No active campus</option>}
+            {campuses.map(campus => (
+              <option key={campus.id} value={campus.id}>{campus.name} · {campus.timezone}</option>
+            ))}
+          </select>
+        </div>
+
         {/* Emergency master controls visible at all times */}
         <div className="flex items-center gap-2 flex-wrap">
           <button
@@ -864,6 +879,12 @@ export const SuperAdminDashboard: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {(campusLoadError || scheduleLoadError) && (
+        <div role="alert" className="rounded-lg border border-rose-500/40 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">
+          {campusLoadError || scheduleLoadError}
+        </div>
+      )}
 
       {/* Emergency banners */}
       {isEmergencyStopped && (
@@ -1112,12 +1133,6 @@ export const SuperAdminDashboard: React.FC = () => {
               <Volume2 className="w-4 h-4" />
               <span>Test ringing: {activeRingingEvent}</span>
               <button onClick={stopRinging} className="ml-auto underline">Stop</button>
-            </div>
-          )}
-
-          {scheduleLoadError && (
-            <div role="alert" className="rounded-lg border border-rose-500/40 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">
-              {scheduleLoadError}
             </div>
           )}
 

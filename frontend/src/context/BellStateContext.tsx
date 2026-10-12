@@ -21,6 +21,7 @@ interface BellStateContextType {
   deviceOnline: boolean;
   lastSyncTime: string;
   scheduleLoadError: string | null;
+  activeScheduleId: string | null;
   scheduleRevision: number;
   availableVoices: SpeechSynthesisVoice[];
   selectedVoiceURI: string;
@@ -608,6 +609,13 @@ export const BellStateProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return () => { active = false; };
     }
 
+    setEvents([]);
+    setPendingApprovals([]);
+    setPlaybackHistory([]);
+    setAuditLogs([]);
+    setScheduleRevision(0);
+    setActiveScheduleId(null);
+
     const loadCampusSchedule = async () => {
       const { data: schedule, error: scheduleError } = await supabase
         .from('schedules')
@@ -652,7 +660,13 @@ export const BellStateProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setAuditLogs([]);
     };
     void loadCampusSchedule().catch(error => {
-      if (active) setScheduleLoadError(error instanceof Error ? error.message : 'Unable to load this campus timetable.');
+      if (!active) return;
+      setEvents([]);
+      setPendingApprovals([]);
+      setPlaybackHistory([]);
+      setAuditLogs([]);
+      setActiveScheduleId(null);
+      setScheduleLoadError(error instanceof Error ? error.message : 'Unable to load this campus timetable.');
     });
     return () => { active = false; };
   }, [currentCampus?.id, currentSchool?.id, isVilacPilotWorkspace, setAuditLogs, setPlaybackHistory]);
@@ -694,14 +708,66 @@ export const BellStateProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
+  const requireCampusTimetable = () => {
+    if (!currentSchool || !currentCampus || !activeScheduleId) {
+      setScheduleLoadError('An active timetable is not available for this campus yet.');
+      return null;
+    }
+    return { school: currentSchool, campus: currentCampus, scheduleId: activeScheduleId };
+  };
+
   // Regulator creates a new draft event
   const createDraftEvent = (eventData: Omit<ScheduleEvent, 'id' | 'created_at' | 'approval_status'>) => {
+    const workspace = isSupabaseConfigured() ? requireCampusTimetable() : null;
+    if (isSupabaseConfigured() && !workspace) return;
+
+    const scopedEvent = {
+      ...eventData,
+      schedule_id: workspace?.scheduleId ?? eventData.schedule_id,
+      school_id: workspace?.school.id ?? eventData.school_id,
+      campus_id: workspace?.campus.id ?? currentCampus?.id ?? eventData.campus_id,
+      last_edited_by: currentUserName,
+    };
+
+    if (workspace) {
+      void (async () => {
+        try {
+          const { data, error } = await supabase
+            .from('schedule_events')
+            .insert({
+              schedule_id: scopedEvent.schedule_id,
+              school_id: scopedEvent.school_id,
+              campus_id: scopedEvent.campus_id,
+              event_name: scopedEvent.event_name,
+              category: scopedEvent.category,
+              start_time: scopedEvent.start_time,
+              days_of_week: scopedEvent.days_of_week,
+              is_enabled: scopedEvent.is_enabled,
+              announcement_text: scopedEvent.announcement_text,
+              language: scopedEvent.language,
+              volume: scopedEvent.volume,
+              repeat_count: scopedEvent.repeat_count,
+              approval_status: 'draft',
+              change_summary: scopedEvent.change_summary,
+              last_edited_by: scopedEvent.last_edited_by,
+            })
+            .select('*')
+            .single();
+          if (error) throw error;
+          setEvents(prev => [...prev, data as ScheduleEvent]);
+          setScheduleLoadError(null);
+        } catch (error) {
+          setScheduleLoadError(error instanceof Error ? error.message : 'Unable to save this draft event.');
+        }
+      })();
+      return;
+    }
+
     const newId = `evt-${Date.now()}`;
     const newEvent: ScheduleEvent = {
-      ...eventData,
+      ...scopedEvent,
       id: newId,
       approval_status: 'draft',
-      last_edited_by: currentUserName,
       created_at: new Date().toISOString(),
     };
 
@@ -721,13 +787,42 @@ export const BellStateProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Regulator updates an event as a draft
   const updateEventAsDraft = (id: string, updates: Partial<ScheduleEvent>) => {
+    const workspace = isSupabaseConfigured() ? requireCampusTimetable() : null;
+    if (isSupabaseConfigured() && !workspace) return;
+
+    const nextValues = {
+      ...updates,
+      approval_status: 'draft' as const,
+      last_edited_by: currentUserName,
+    };
+
+    if (workspace) {
+      void (async () => {
+        try {
+          const { data, error } = await supabase
+            .from('schedule_events')
+            .update(nextValues)
+            .eq('id', id)
+            .eq('school_id', workspace.school.id)
+            .eq('campus_id', workspace.campus.id)
+            .eq('schedule_id', workspace.scheduleId)
+            .select('*')
+            .single();
+          if (error) throw error;
+          setEvents(prev => prev.map(ev => ev.id === id ? data as ScheduleEvent : ev));
+          setScheduleLoadError(null);
+        } catch (error) {
+          setScheduleLoadError(error instanceof Error ? error.message : 'Unable to update this draft event.');
+        }
+      })();
+      return;
+    }
+
     setEvents(prev => prev.map(ev => {
       if (ev.id === id) {
         return {
           ...ev,
-          ...updates,
-          approval_status: 'draft',
-          last_edited_by: currentUserName,
+          ...nextValues,
           updated_at: new Date().toISOString(),
         };
       }
@@ -739,26 +834,54 @@ export const BellStateProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const submitEventForApproval = (id: string) => {
     const target = events.find(e => e.id === id);
     if (!target) return;
+    const workspace = isSupabaseConfigured() ? requireCampusTimetable() : null;
+    if (isSupabaseConfigured() && !workspace) return;
 
-    // Update status to awaiting_principal
-    setEvents(prev => prev.map(e => e.id === id ? { ...e, approval_status: 'awaiting_principal' } : e));
-
-    // Create a pending approval item
-    const newApproval: PendingApproval = {
-      id: `appr-${Date.now()}`,
-      school_id: target.school_id,
-      type: 'timetable_edit',
-      title: `${target.event_name} (${target.start_time})`,
-      description: `${currentUserName} submitted changes for "${target.event_name}". Time set to ${target.start_time}, repetition ${target.repeat_count}x.`,
-      target_event_id: target.id,
-      event_payload: target,
-      submitted_by: currentUserEmail,
-      submitted_by_name: currentUserName,
-      submitted_at: 'Just now',
-      status: 'pending',
+    const queueApproval = (event: ScheduleEvent, approvalId: string) => {
+      setPendingApprovals(prev => [
+        {
+          id: approvalId,
+          school_id: event.school_id,
+          type: 'timetable_edit',
+          title: `${event.event_name} (${event.start_time})`,
+          description: `${currentUserName} submitted changes for "${event.event_name}". Time set to ${event.start_time}, repetition ${event.repeat_count}x.`,
+          target_event_id: event.id,
+          event_payload: event,
+          submitted_by: currentUserEmail,
+          submitted_by_name: currentUserName,
+          submitted_at: 'Just now',
+          status: 'pending',
+        },
+        ...prev.filter(item => item.target_event_id !== event.id),
+      ]);
     };
 
-    setPendingApprovals(prev => [newApproval, ...prev]);
+    if (workspace) {
+      void (async () => {
+        try {
+          const { data, error } = await supabase
+            .from('schedule_events')
+            .update({ approval_status: 'awaiting_principal' })
+            .eq('id', id)
+            .eq('school_id', workspace.school.id)
+            .eq('campus_id', workspace.campus.id)
+            .eq('schedule_id', workspace.scheduleId)
+            .select('*')
+            .single();
+          if (error) throw error;
+          const saved = data as ScheduleEvent;
+          setEvents(prev => prev.map(e => e.id === id ? saved : e));
+          queueApproval(saved, saved.id);
+          setScheduleLoadError(null);
+        } catch (error) {
+          setScheduleLoadError(error instanceof Error ? error.message : 'Unable to submit this event for approval.');
+        }
+      })();
+      return;
+    }
+
+    setEvents(prev => prev.map(e => e.id === id ? { ...e, approval_status: 'awaiting_principal' } : e));
+    queueApproval(target, `appr-${Date.now()}`);
 
     setAuditLogs(prev => [
       {
@@ -775,6 +898,33 @@ export const BellStateProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Regulator deletes event
   const deleteEvent = (id: string) => {
     const target = events.find(e => e.id === id);
+    const workspace = isSupabaseConfigured() ? requireCampusTimetable() : null;
+    if (isSupabaseConfigured() && !workspace) return;
+
+    if (workspace) {
+      void (async () => {
+        try {
+          const { data, error } = await supabase
+            .from('schedule_events')
+            .delete()
+            .eq('id', id)
+            .eq('school_id', workspace.school.id)
+            .eq('campus_id', workspace.campus.id)
+            .eq('schedule_id', workspace.scheduleId)
+            .select('id')
+            .maybeSingle();
+          if (error) throw error;
+          if (!data) throw new Error('The event was not deleted; check your access to this campus.');
+          setEvents(prev => prev.filter(e => e.id !== id));
+          setPendingApprovals(prev => prev.filter(p => p.target_event_id !== id));
+          setScheduleLoadError(null);
+        } catch (error) {
+          setScheduleLoadError(error instanceof Error ? error.message : 'Unable to delete this event.');
+        }
+      })();
+      return;
+    }
+
     setEvents(prev => prev.filter(e => e.id !== id));
     setPendingApprovals(prev => prev.filter(p => p.target_event_id !== id));
 
@@ -824,29 +974,45 @@ export const BellStateProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const approvePendingItem = (approvalId: string) => {
     const item = pendingApprovals.find(p => p.id === approvalId);
     if (!item) return;
+    const workspace = isSupabaseConfigured() ? requireCampusTimetable() : null;
+    if (isSupabaseConfigured() && !workspace) return;
 
-    // Remove from pending
-    setPendingApprovals(prev => prev.filter(p => p.id !== approvalId));
+    const markApproved = (eventId?: string) => {
+      setPendingApprovals(prev => prev.filter(p => p.id !== approvalId));
+      if (!eventId) return;
+      setEvents(prev => prev.map(e => e.id === eventId
+        ? { ...e, approval_status: 'live_on_device', updated_at: new Date().toISOString() }
+        : e));
+    };
 
-    // If it relates to a schedule event, mark it as 'live_on_device'
-    if (item.target_event_id) {
-      setEvents(prev => prev.map(e => {
-        if (e.id === item.target_event_id) {
-          return {
-            ...e,
-            approval_status: 'live_on_device',
-            updated_at: new Date().toISOString(),
-          };
+    if (workspace && item.target_event_id) {
+      void (async () => {
+        try {
+          const { data, error } = await supabase
+            .from('schedule_events')
+            .update({ approval_status: 'live_on_device' })
+            .eq('id', item.target_event_id)
+            .eq('school_id', workspace.school.id)
+            .eq('campus_id', workspace.campus.id)
+            .eq('schedule_id', workspace.scheduleId)
+            .select('*')
+            .single();
+          if (error) throw error;
+          setPendingApprovals(prev => prev.filter(p => p.id !== approvalId));
+          setEvents(prev => prev.map(e => e.id === item.target_event_id ? data as ScheduleEvent : e));
+          setScheduleRevision(prev => prev + 1);
+          setLastSyncTime('Just synced (New Revision)');
+          setScheduleLoadError(null);
+        } catch (error) {
+          setScheduleLoadError(error instanceof Error ? error.message : 'Unable to approve this timetable change.');
         }
-        return e;
-      }));
+      })();
+      return;
     }
 
-    // Increment schedule revision and update sync time
+    markApproved(item.target_event_id);
     setScheduleRevision(prev => prev + 1);
     setLastSyncTime('Just synced (New Revision)');
-
-    // Add to audit logs
     setAuditLogs(prev => [
       {
         id: `log-${Date.now()}`,
@@ -863,6 +1029,34 @@ export const BellStateProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const rejectPendingItem = (approvalId: string, reason: string = 'Changes requested by Principal') => {
     const item = pendingApprovals.find(p => p.id === approvalId);
     if (!item) return;
+    const workspace = isSupabaseConfigured() ? requireCampusTimetable() : null;
+    if (isSupabaseConfigured() && !workspace) return;
+
+    if (workspace && item.target_event_id) {
+      void (async () => {
+        try {
+          const { data, error } = await supabase
+            .from('schedule_events')
+            .update({
+              approval_status: 'draft',
+              change_summary: `Rejected by Principal: ${reason}`,
+            })
+            .eq('id', item.target_event_id)
+            .eq('school_id', workspace.school.id)
+            .eq('campus_id', workspace.campus.id)
+            .eq('schedule_id', workspace.scheduleId)
+            .select('*')
+            .single();
+          if (error) throw error;
+          setPendingApprovals(prev => prev.filter(p => p.id !== approvalId));
+          setEvents(prev => prev.map(e => e.id === item.target_event_id ? data as ScheduleEvent : e));
+          setScheduleLoadError(null);
+        } catch (error) {
+          setScheduleLoadError(error instanceof Error ? error.message : 'Unable to return this event to draft.');
+        }
+      })();
+      return;
+    }
 
     setPendingApprovals(prev => prev.filter(p => p.id !== approvalId));
 
@@ -957,6 +1151,8 @@ export const BellStateProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         activeRingingEvent,
         deviceOnline,
         lastSyncTime,
+        scheduleLoadError,
+        activeScheduleId,
         scheduleRevision,
         availableVoices,
         selectedVoiceURI: selectedVoiceURIState,

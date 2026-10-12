@@ -30,6 +30,7 @@ export const PrincipalDashboard: React.FC = () => {
     isEmergencyStopped, 
     speakerConnected, 
     lastSyncTime,
+    scheduleLoadError,
     scheduleRevision,
     approvePendingItem, 
     rejectPendingItem, 
@@ -122,6 +123,12 @@ export const PrincipalDashboard: React.FC = () => {
         </div>
       )}
 
+      {scheduleLoadError && (
+        <div role="alert" className="rounded-lg border border-rose-500/40 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">
+          {scheduleLoadError}
+        </div>
+      )}
+
       {/* TOP HEADER: INSTITUTION OVERSIGHT IDENTITY & CONTROLS */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
         <div className="flex items-center space-x-4">
@@ -139,7 +146,7 @@ export const PrincipalDashboard: React.FC = () => {
               {currentSchool?.name || 'School'}
             </h1>
             <p className="text-xs text-slate-400">
-              {user?.full_name || 'Principal'} &bull; Head of Oversight & Governance
+              {user?.full_name || 'Principal'} &bull; {currentCampus?.name || 'Campus'} &bull; {scheduleTimeZone}
             </p>
           </div>
         </div>

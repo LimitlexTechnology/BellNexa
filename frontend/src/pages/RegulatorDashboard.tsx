@@ -37,6 +37,8 @@ export const RegulatorDashboard: React.FC = () => {
     playTestChime,
     isRingingNow,
     activeRingingEvent,
+    scheduleLoadError,
+    activeScheduleId,
     scheduleRevision
   } = useBellState();
   const scheduleTimeZone = getPreferredTimeZone(
@@ -65,6 +67,7 @@ export const RegulatorDashboard: React.FC = () => {
 
   // Handle Event Modal Open for New
   const handleOpenAddModal = () => {
+    if (!activeScheduleId && scheduleLoadError) return;
     setEditingEventId(null);
     setFormName('');
     setFormCategory('lesson_change');
@@ -110,8 +113,9 @@ export const RegulatorDashboard: React.FC = () => {
       }
     } else {
       createDraftEvent({
-        schedule_id: 'sched-vilac-1',
+        schedule_id: activeScheduleId || 'sched-vilac-1',
         school_id: currentSchool?.id || '00000000-0000-0000-0000-000000000001',
+        campus_id: currentCampus?.id,
         event_name: formName,
         category: formCategory,
         start_time: formTime,
@@ -173,6 +177,12 @@ export const RegulatorDashboard: React.FC = () => {
         </div>
       )}
 
+      {scheduleLoadError && (
+        <div role="alert" className="rounded-lg border border-rose-500/40 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">
+          {scheduleLoadError}
+        </div>
+      )}
+
       {/* HEADER: REGULATOR WORKSPACE */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
         <div>
@@ -204,7 +214,8 @@ export const RegulatorDashboard: React.FC = () => {
 
           <button
             onClick={handleOpenAddModal}
-            className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-5 py-2.5 rounded-xl text-xs font-black bg-[#12C8E8] hover:bg-[#087F9B] text-white shadow-lg shadow-cyan-950/50 transition"
+            disabled={Boolean(scheduleLoadError && !activeScheduleId)}
+            className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-5 py-2.5 rounded-xl text-xs font-black bg-[#12C8E8] hover:bg-[#087F9B] text-white shadow-lg shadow-cyan-950/50 transition disabled:opacity-60"
           >
             <Plus className="w-4 h-4" />
             <span>Add Event</span>

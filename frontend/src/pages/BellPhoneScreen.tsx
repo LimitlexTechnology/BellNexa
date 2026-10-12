@@ -25,6 +25,7 @@ export const BellPhoneScreen: React.FC = () => {
     triggerEmergencyStop, 
     resumeFromEmergencyStop,
     lastSyncTime,
+    scheduleLoadError,
     scheduleRevision,
     isRingingNow,
     activeRingingEvent,
@@ -71,7 +72,7 @@ export const BellPhoneScreen: React.FC = () => {
               </span>
             </div>
             <p className="text-[11px] text-slate-400">
-              Dedicated Android Bell Hardware &bull; AlarmManager Armed
+              {currentCampus?.name || 'Campus'} &bull; {scheduleTimeZone} &bull; Dedicated Android Bell Hardware
             </p>
           </div>
         </div>
@@ -108,7 +109,12 @@ export const BellPhoneScreen: React.FC = () => {
       {/* CENTER STAGE: NEXT BELL, LIVE COUNTDOWN & SPEAKER STATUS */}
       {/* ========================================================= */}
       <main className="my-auto py-8 flex flex-col items-center justify-center text-center space-y-6 max-w-2xl mx-auto w-full">
-        
+        {scheduleLoadError && (
+          <div role="alert" className="w-full rounded-lg border border-rose-500/40 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">
+            {scheduleLoadError}
+          </div>
+        )}
+
         {/* SPEAKER CONNECTED / DISCONNECTED INDICATOR */}
         <div className="flex flex-col items-center space-y-2">
           <div 
