@@ -11,7 +11,7 @@ import { BellPhoneScreen } from './pages/BellPhoneScreen';
 import { InstallPrompt } from './components/InstallPrompt';
 
 const MainAppContent: React.FC = () => {
-  const { isAuthenticated, role, isBellPhoneMode, isLoading } = useAuth();
+  const { isAuthenticated, role, isBellPhoneMode, isLoading, requiresPasswordSetup } = useAuth();
 
   // The school phone at school opens to a different home screen, not the login page.
   // It stays signed in unattended.
@@ -25,6 +25,10 @@ const MainAppContent: React.FC = () => {
         <p className="text-sm font-semibold">Checking your BellNexa session…</p>
       </div>
     );
+  }
+
+  if (requiresPasswordSetup) {
+    return <Login />;
   }
 
   // Everyone who uses the app has to log in, so the first page is a sign-in screen rather than a dashboard.

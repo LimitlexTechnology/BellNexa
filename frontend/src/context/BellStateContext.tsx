@@ -3,8 +3,7 @@ import {
   ScheduleEvent, 
   PendingApproval, 
   PlaybackEvent, 
-  AuditLog, 
-  Invitation 
+  AuditLog
 } from '../types/database';
 import { useAuth } from './AuthContext';
 
@@ -13,7 +12,6 @@ interface BellStateContextType {
   pendingApprovals: PendingApproval[];
   playbackHistory: PlaybackEvent[];
   auditLogs: AuditLog[];
-  invitations: Invitation[];
   isBellsPaused: boolean;
   isEmergencyStopped: boolean;
   speakerConnected: boolean;
@@ -39,11 +37,6 @@ interface BellStateContextType {
   togglePauseAllBells: () => void;
   triggerEmergencyStop: () => void;
   resumeFromEmergencyStop: () => void;
-
-  // Actions for Super Admin
-  createInvitation: (email: string, role: 'principal' | 'regulator', schoolId: string, schoolName: string) => Invitation;
-  revokeInvitation: (id: string) => void;
-  deleteSchool: (schoolId: string) => void;
 
   // Phone / Hardware Controls
   toggleSpeakerConnection: () => void;
@@ -342,33 +335,6 @@ const INITIAL_PLAYBACK_HISTORY: PlaybackEvent[] = [
   }
 ];
 
-const INITIAL_INVITATIONS: Invitation[] = [
-  {
-    id: 'inv-1',
-    school_id: '00000000-0000-0000-0000-000000000001',
-    school_name: 'Vilac International School',
-    email: 'principal@vilac.edu.gh',
-    role: 'principal',
-    token: 'INV-VILAC-PRIN-88219',
-    expires_at: '2026-10-24',
-    is_used: true,
-    invited_by: 'Demo data (not an authenticated user)',
-    created_at: new Date(Date.now() - 86400000 * 3).toISOString(),
-  },
-  {
-    id: 'inv-2',
-    school_id: '00000000-0000-0000-0000-000000000001',
-    school_name: 'Vilac International School',
-    email: 'regulator@vilac.edu.gh',
-    role: 'regulator',
-    token: 'INV-VILAC-REG-99412',
-    expires_at: '2026-10-24',
-    is_used: true,
-    invited_by: 'Demo data (not an authenticated user)',
-    created_at: new Date(Date.now() - 86400000 * 3).toISOString(),
-  }
-];
-
 const DEMO_AUDIT_SEEDED_AT = Date.now();
 
 const BellStateContext = createContext<BellStateContextType | undefined>(undefined);
@@ -555,8 +521,7 @@ export const BellStateProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const [events, setEvents] = useState<ScheduleEvent[]>(INITIAL_EVENTS);
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>(INITIAL_PENDING_APPROVALS);
-  const [playbackHistory, setPlaybackHistory] = useState<PlaybackEvent[]>(INITIAL_PLAYBACK_HISTORY);
-  const [invitations, setInvitations] = useState<Invitation[]>(INITIAL_INVITATIONS);
+  const [playbackHistory] = useState<PlaybackEvent[]>(INITIAL_PLAYBACK_HISTORY);
   const [isBellsPaused, setIsBellsPaused] = useState<boolean>(false);
   const [isEmergencyStopped, setIsEmergencyStopped] = useState<boolean>(false);
   const [speakerConnected, setSpeakerConnected] = useState<boolean>(true);
@@ -871,68 +836,6 @@ export const BellStateProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     ]);
   };
 
-  // Super Admin creates an invitation specifically for Principal or Regulator
-  const createInvitation = (email: string, role: 'principal' | 'regulator', schoolId: string, schoolName: string): Invitation => {
-    const rolePrefix = role === 'principal' ? 'PRIN' : 'REG';
-    const randNum = Math.floor(10000 + Math.random() * 90000);
-    const newInv: Invitation = {
-      id: `inv-${Date.now()}`,
-      school_id: schoolId || currentSchoolId,
-      school_name: schoolName,
-      email,
-      role,
-      token: `INV-VILAC-${rolePrefix}-${randNum}`,
-      expires_at: '2026-10-31',
-      is_used: false,
-      invited_by: currentUserEmail,
-      created_at: new Date().toISOString(),
-    };
-
-    setInvitations(prev => [newInv, ...prev]);
-
-    setAuditLogs(prev => [
-      {
-        id: `log-${Date.now()}`,
-        action: 'INVITATION_GENERATED',
-        resource_type: 'invitation',
-        metadata: { email, role, token: newInv.token },
-        created_at: new Date().toISOString(),
-      },
-      ...prev
-    ]);
-
-    return newInv;
-  };
-
-  const revokeInvitation = (id: string) => {
-    setInvitations(prev => prev.filter(inv => inv.id !== id));
-  };
-
-  // Remove school-scoped records represented in this browser pilot.
-  const deleteSchool = (schoolId: string) => {
-    const removedInvitations = invitations.filter(inv => inv.school_id === schoolId);
-
-    setEvents(prev => prev.filter(e => e.school_id !== schoolId));
-    setPendingApprovals(prev => prev.filter(p => p.school_id !== schoolId));
-    setPlaybackHistory(prev => prev.filter(p => p.school_id !== schoolId));
-    setInvitations(prev => prev.filter(inv => inv.school_id !== schoolId));
-
-    setAuditLogs(prev => [
-      {
-        id: `log-${Date.now()}`,
-        action: 'SCHOOL_DELETED_WITH_ASSOCIATED_DATA',
-        resource_type: 'school',
-        metadata: {
-          school_id: schoolId,
-          removed_invitations: removedInvitations.map(inv => inv.email),
-          removed_invitation_count: removedInvitations.length,
-        },
-        created_at: new Date().toISOString(),
-      },
-      ...prev
-    ]);
-  };
-
   // Speaker Connection toggle on Phone hardware
   const toggleSpeakerConnection = () => {
     setSpeakerConnected(prev => !prev);
@@ -945,7 +848,6 @@ export const BellStateProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         pendingApprovals,
         playbackHistory,
         auditLogs,
-        invitations,
         isBellsPaused,
         isEmergencyStopped,
         speakerConnected,
@@ -969,10 +871,6 @@ export const BellStateProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         togglePauseAllBells,
         triggerEmergencyStop,
         resumeFromEmergencyStop,
-
-        createInvitation,
-        revokeInvitation,
-        deleteSchool,
 
         toggleSpeakerConnection,
         playTestChime,

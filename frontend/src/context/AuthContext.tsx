@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Session } from '@supabase/supabase-js';
-import { Profile, School, UserRole } from '../types/database';
+import { Invitation, Profile, School, UserRole } from '../types/database';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 
 interface LoginResult {
@@ -29,9 +29,13 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   authError: string | null;
+  accountSyncStatus: 'connecting' | 'connected' | 'polling' | 'offline' | 'error';
+  accountSyncError: string | null;
   isBellPhoneMode: boolean;
   mfaSetup: MfaSetup | null;
   isPasswordRecovery: boolean;
+  requiresPasswordSetup: boolean;
+  invitations: Invitation[];
   setBellPhoneMode: (active: boolean) => void;
   signIn: (email: string, password: string) => Promise<LoginResult>;
   completeMFA: (code: string) => Promise<LoginResult>;
@@ -39,6 +43,9 @@ interface AuthContextType {
   sendPasswordReset: (email: string) => Promise<{ error?: string }>;
   updatePassword: (password: string) => Promise<{ error?: string }>;
   updateProfile: (updates: Pick<Profile, 'full_name' | 'phone'>) => Promise<void>;
+  refreshInvitations: () => Promise<void>;
+  createInvitation: (email: string, fullName: string, role: 'principal' | 'regulator', schoolId: string) => Promise<Invitation>;
+  revokeInvitation: (id: string) => Promise<void>;
   logout: () => Promise<void>;
   setCurrentSchool: (school: School | null) => void;
 }
@@ -71,16 +78,27 @@ const roleFromMembership = (value: string): UserRole | null => {
   }
 };
 
+const functionErrorMessage = async (error: Error): Promise<string> => {
+  if ('context' in error && error.context instanceof Response) {
+    const responseBody = await error.context.clone().json().catch(() => null) as { error?: unknown } | null;
+    if (typeof responseBody?.error === 'string') return responseBody.error;
+  }
+  return error.message;
+};
+
 const getPendingAccount = async (session: Session): Promise<PendingAccount> => {
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('id, email, full_name, phone, is_super_admin, created_at, updated_at')
+    .select('id, email, full_name, phone, is_super_admin, is_active, must_change_password, created_at, updated_at')
     .eq('id', session.user.id)
     .maybeSingle();
 
   if (profileError) throw profileError;
   if (!profile) {
     throw new Error('Your account profile is not provisioned. Contact the BellNexa administrator.');
+  }
+  if (!profile.is_active) {
+    throw new Error('Your BellNexa account is disabled. Contact your school administrator or BellNexa support.');
   }
 
   const accountProfile: Profile = {
@@ -108,6 +126,14 @@ const getPendingAccount = async (session: Session): Promise<PendingAccount> => {
     throw new Error('Your account does not have an approved school role. Contact your school administrator.');
   }
 
+  if (profile.must_change_password) {
+    return {
+      profile: { ...accountProfile, role },
+      role,
+      school: null,
+    };
+  }
+
   const { data: school, error: schoolError } = await supabase
     .from('schools')
     .select('id, name, code, timezone, logo_url, branding_primary, branding_secondary, branding_accent, is_active, created_at, updated_at')
@@ -132,9 +158,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [role, setRole] = useState<UserRole | null>(null);
   const [isLoading, setIsLoading] = useState(() => isSupabaseConfigured());
   const [authError, setAuthError] = useState<string | null>(null);
+  const [accountSyncStatus, setAccountSyncStatus] = useState<AuthContextType['accountSyncStatus']>('connecting');
+  const [accountSyncError, setAccountSyncError] = useState<string | null>(null);
   const [mfaSetup, setMfaSetup] = useState<MfaSetup | null>(null);
   const [pendingAccount, setPendingAccount] = useState<PendingAccount | null>(null);
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  const [requiresPasswordSetup, setRequiresPasswordSetup] = useState(false);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
   const passwordRecoveryRef = useRef(false);
   const [isBellPhoneMode, setBellPhoneMode] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
@@ -145,6 +175,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(account.profile);
     setRole(account.role);
     setCurrentSchool(account.school);
+    setRequiresPasswordSetup(account.profile.must_change_password);
     setMfaSetup(null);
     setPendingAccount(null);
   }, []);
@@ -213,6 +244,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setCurrentSchool(null);
         setPendingAccount(null);
         setMfaSetup(null);
+        setRequiresPasswordSetup(false);
+        setInvitations([]);
       }
     });
 
@@ -254,6 +287,112 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [loadSession]);
 
+  const accountUserId = user?.id;
+  useEffect(() => {
+    if (!accountUserId || !isSupabaseConfigured()) return;
+
+    const userId = accountUserId;
+    const schoolId = currentSchool?.id;
+    let active = true;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let realtimeConnected = false;
+    let refreshInProgress = false;
+    const refreshAccount = async () => {
+      if (!active || refreshInProgress || !navigator.onLine) return;
+      refreshInProgress = true;
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        if (!data.session) throw new Error('Your authenticated session is no longer available.');
+        await loadSession(data.session);
+        if (active) {
+          setAccountSyncError(null);
+          setAccountSyncStatus(realtimeConnected ? 'connected' : 'polling');
+        }
+      } catch (error) {
+        if (active) {
+          const message = error instanceof Error ? error.message : 'Unable to refresh account access.';
+          const accessWasRevoked = /disabled|does not have an approved school role|assigned school is unavailable|profile is not provisioned/i.test(message);
+          if (accessWasRevoked) {
+            const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' });
+            setUser(null);
+            setRole(null);
+            setCurrentSchool(null);
+            setInvitations([]);
+            setAuthError(`${message}${signOutError ? ` Sign-out failed: ${signOutError.message}` : ''}`);
+          } else {
+            setAccountSyncError(message);
+          }
+          setAccountSyncStatus('error');
+        }
+      } finally {
+        refreshInProgress = false;
+      }
+    };
+
+    const subscribe = () => {
+      if (!active || !navigator.onLine) return;
+      setAccountSyncStatus('connecting');
+      channel = supabase.channel(`account-access-${userId}`);
+      channel
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` }, () => { void refreshAccount(); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'school_memberships', filter: `user_id=eq.${userId}` }, () => { void refreshAccount(); });
+      if (schoolId) {
+        channel.on('postgres_changes', { event: '*', schema: 'public', table: 'schools', filter: `id=eq.${schoolId}` }, () => { void refreshAccount(); });
+      }
+      channel.subscribe((status) => {
+        if (!active) return;
+        if (status === 'SUBSCRIBED') {
+          realtimeConnected = true;
+          setAccountSyncStatus('connected');
+          void refreshAccount();
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          realtimeConnected = false;
+          setAccountSyncStatus(navigator.onLine ? 'polling' : 'offline');
+          setAccountSyncError('Account live updates are unavailable; periodic refresh will continue.');
+        }
+      });
+    };
+
+    const handleOffline = () => {
+      realtimeConnected = false;
+      setAccountSyncStatus('offline');
+      setAccountSyncError('Offline: account access will refresh when connectivity returns.');
+    };
+    const handleOnline = () => {
+      void refreshAccount();
+      if (channel) {
+        const previousChannel = channel;
+        channel = null;
+        void supabase.removeChannel(previousChannel).then(subscribe).catch((error: unknown) => {
+          if (!active) return;
+          setAccountSyncStatus('polling');
+          setAccountSyncError(error instanceof Error ? error.message : 'Unable to reconnect account live updates.');
+          subscribe();
+        });
+      } else {
+        subscribe();
+      }
+    };
+    const handleFocus = () => { void refreshAccount(); };
+
+    subscribe();
+    const pollTimer = window.setInterval(() => {
+      if (!realtimeConnected) void refreshAccount();
+    }, 60_000);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      active = false;
+      window.clearInterval(pollTimer);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('focus', handleFocus);
+      if (channel) void supabase.removeChannel(channel);
+    };
+  }, [accountUserId, currentSchool?.id, loadSession]);
+
   const signIn = async (email: string, password: string): Promise<LoginResult> => {
     if (!isSupabaseConfigured()) {
       return { success: false, error: 'Supabase is not configured. Set the public project URL and anon key before signing in.' };
@@ -270,7 +409,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: email.trim().toLowerCase(),
         password,
       });
-      if (error) return { success: false, error: error.message };
+      if (error) {
+        if (error.code === 'email_not_confirmed') {
+          return { success: false, error: 'Confirm your email using the link we sent before signing in.' };
+        }
+        if (error.code === 'user_banned') {
+          return { success: false, error: 'Your BellNexa account is disabled. Contact your school administrator or BellNexa support.' };
+        }
+        return { success: false, error: error.message };
+      }
       if (!data.session) return { success: false, error: 'Supabase did not create an authenticated session.' };
 
       const account = await getPendingAccount(data.session);
@@ -372,6 +519,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updatePassword = async (password: string): Promise<{ error?: string }> => {
     const { error } = await supabase.auth.updateUser({ password });
     if (error) return { error: error.message };
+    if (requiresPasswordSetup) {
+      const { error: setupError } = await supabase.functions.invoke('manage-invitations', {
+        body: { action: 'complete-setup' },
+      });
+      if (setupError) return { error: await functionErrorMessage(setupError) };
+      setRequiresPasswordSetup(false);
+    }
     passwordRecoveryRef.current = false;
     setIsPasswordRecovery(false);
     const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' });
@@ -388,11 +542,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .from('profiles')
       .update({ full_name: fullName, phone })
       .eq('id', user.id)
-      .select('id, email, full_name, phone, is_super_admin, created_at, updated_at')
+      .select('id, email, full_name, phone, is_super_admin, is_active, must_change_password, created_at, updated_at')
       .single();
     if (error) throw error;
     setUser({ ...data, role: role ?? user.role, requires_2fa: data.is_super_admin });
   };
+
+  const refreshInvitations = useCallback(async (): Promise<void> => {
+    if (role !== 'super_admin') {
+      setInvitations([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from('invitations')
+      .select('id, school_id, email, role, expires_at, is_used, revoked_at, created_by, created_at')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    setInvitations((data ?? []).map((invitation) => ({
+      ...invitation,
+      invited_by: invitation.created_by,
+    })));
+  }, [role]);
+
+  const createInvitation = useCallback(async (
+    email: string,
+    fullName: string,
+    invitationRole: 'principal' | 'regulator',
+    schoolId: string,
+  ): Promise<Invitation> => {
+    const { data, error } = await supabase.functions.invoke('manage-invitations', {
+      body: { action: 'invite', email, fullName, role: invitationRole, schoolId },
+    });
+    if (error) throw new Error(await functionErrorMessage(error));
+    if (!data?.invitation) throw new Error('The invitation service returned no invitation record.');
+    await refreshInvitations();
+    return {
+      ...data.invitation,
+      invited_by: user?.id ?? '',
+    } satisfies Invitation;
+  }, [refreshInvitations, user?.id]);
+
+  const revokeInvitation = useCallback(async (id: string): Promise<void> => {
+    const { error } = await supabase.functions.invoke('manage-invitations', {
+      body: { action: 'revoke', invitationId: id },
+    });
+    if (error) throw new Error(await functionErrorMessage(error));
+    await refreshInvitations();
+  }, [refreshInvitations]);
 
   const logout = async (): Promise<void> => {
     const { error } = await supabase.auth.signOut();
@@ -408,9 +604,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: !!user,
         isLoading,
         authError,
+        accountSyncStatus: user ? accountSyncStatus : 'connecting',
+        accountSyncError: user ? accountSyncError : null,
         isBellPhoneMode,
         mfaSetup,
         isPasswordRecovery,
+        requiresPasswordSetup,
+        invitations,
         setBellPhoneMode,
         signIn,
         completeMFA,
@@ -418,6 +618,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sendPasswordReset,
         updatePassword,
         updateProfile,
+        refreshInvitations,
+        createInvitation,
+        revokeInvitation,
         logout,
         setCurrentSchool,
       }}

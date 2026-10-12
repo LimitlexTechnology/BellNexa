@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useRef, useState, useEffect } from 'react';
 import {
   Building2,
   Smartphone,
@@ -7,11 +7,9 @@ import {
   Clock,
   Send,
   Key,
-  Copy,
   ArrowRight,
   Shield,
   Calendar,
-  AlertTriangle,
   LifeBuoy,
   Bell,
   Volume2,
@@ -33,6 +31,7 @@ import { useBellState } from '../context/BellStateContext';
 import { useAuth, MOCK_VILAC_SCHOOL } from '../context/AuthContext';
 import { School, SupportTicket, ScheduleEvent, EventCategory } from '../types/database';
 import { VilacEmblem } from '../components/VilacEmblem';
+import { supabase } from '../lib/supabase';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -51,13 +50,12 @@ type SchoolTab = 'overview' | 'timetable' | 'approvals' | 'device' | 'invitation
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export const SuperAdminDashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, invitations, refreshInvitations, createInvitation, revokeInvitation } = useAuth();
   const {
     events,
     pendingApprovals,
     playbackHistory,
     auditLogs,
-    invitations,
     isBellsPaused,
     isEmergencyStopped,
     speakerConnected,
@@ -77,50 +75,126 @@ export const SuperAdminDashboard: React.FC = () => {
     togglePauseAllBells,
     triggerEmergencyStop,
     resumeFromEmergencyStop,
-    // SA powers
-    createInvitation,
-    revokeInvitation,
-    deleteSchool,
     playTestChime,
     stopRinging,
   } = useBellState();
 
   // ── Platform schools list ──
-  const [schools, setSchools] = useState<School[]>(() => {
-    const initialSchools: School[] = [
-      MOCK_VILAC_SCHOOL,
-      {
-        id: '00000000-0000-0000-0000-000000000002',
-        name: 'Achimota Preparatory School',
-        code: 'ACHIMOTA-ACCRA',
-        timezone: 'Africa/Accra',
-        branding_primary: '#1E3A8A',
-        branding_secondary: '#D97706',
-        branding_accent: '#F59E0B',
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      {
-        id: '00000000-0000-0000-0000-000000000003',
-        name: 'Prempeh College',
-        code: 'PREMPEH-KUMASI',
-        timezone: 'Africa/Accra',
-        branding_primary: '#065F46',
-        branding_secondary: '#B45309',
-        branding_accent: '#FBBF24',
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-    ];
-    try {
-      const deletedIds = JSON.parse(window.localStorage.getItem('bellnexa-deleted-schools') || '[]');
-      return initialSchools.filter(school => !deletedIds.includes(school.id));
-    } catch {
-      return initialSchools;
-    }
-  });
+  const [schools, setSchools] = useState<School[]>([]);
+  const [schoolsLoading, setSchoolsLoading] = useState(true);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<'connecting' | 'connected' | 'polling' | 'offline' | 'error'>('connecting');
+  const [lastDataSyncAt, setLastDataSyncAt] = useState<Date | null>(null);
+  const refreshPromise = useRef<Promise<void> | null>(null);
+  const realtimeConnected = useRef(false);
+
+  const refreshSharedRecords = useCallback(async (): Promise<void> => {
+    if (refreshPromise.current) return refreshPromise.current;
+
+    const refreshTask = (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('schools')
+          .select('id, name, code, timezone, logo_url, branding_primary, branding_secondary, branding_accent, is_active, created_at, updated_at')
+          .eq('is_active', true)
+          .order('name', { ascending: true });
+        if (error) throw error;
+        setSchools(data ?? []);
+        await refreshInvitations();
+        setLastDataSyncAt(new Date());
+        setSyncError(null);
+        setSyncStatus(realtimeConnected.current && navigator.onLine ? 'connected' : navigator.onLine ? 'polling' : 'offline');
+      } catch (error) {
+        setSyncError(error instanceof Error ? error.message : 'Unable to refresh school and invitation data.');
+        setSyncStatus(navigator.onLine ? 'error' : 'offline');
+      } finally {
+        setSchoolsLoading(false);
+      }
+    })();
+
+    refreshPromise.current = refreshTask;
+    await refreshTask;
+    refreshPromise.current = null;
+  }, [refreshInvitations]);
+
+  useEffect(() => {
+    let active = true;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let refreshDebounce: number | null = null;
+
+    const refreshAfterChange = () => {
+      if (refreshDebounce !== null) window.clearTimeout(refreshDebounce);
+      refreshDebounce = window.setTimeout(() => {
+        if (active) void refreshSharedRecords();
+      }, 200);
+    };
+
+    const subscribe = () => {
+      if (!active || !navigator.onLine) return;
+      setSyncStatus('connecting');
+      channel = supabase
+        .channel(`super-admin-live-data-${user?.id ?? 'unknown'}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'schools' }, refreshAfterChange)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'invitations' }, refreshAfterChange)
+        .subscribe((status) => {
+          if (!active) return;
+          if (status === 'SUBSCRIBED') {
+            realtimeConnected.current = true;
+            setSyncStatus('connected');
+            void refreshSharedRecords();
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            realtimeConnected.current = false;
+            setSyncStatus(navigator.onLine ? 'polling' : 'offline');
+            setSyncError('Live updates are unavailable; BellNexa will retry and periodically refresh this data.');
+          }
+        });
+    };
+
+    const handleOffline = () => {
+      realtimeConnected.current = false;
+      setSyncStatus('offline');
+      setSyncError('You are offline. Showing the last data loaded; updates will resume when you reconnect.');
+    };
+    const handleOnline = () => {
+      setSyncError(null);
+      void refreshSharedRecords();
+      if (channel) {
+        const oldChannel = channel;
+        channel = null;
+        void supabase.removeChannel(oldChannel).then(subscribe).catch((error: unknown) => {
+          if (!active) return;
+          setSyncStatus('polling');
+          setSyncError(error instanceof Error ? error.message : 'Unable to restart live updates.');
+          subscribe();
+        });
+      } else {
+        subscribe();
+      }
+    };
+    const handleFocus = () => {
+      if (navigator.onLine) void refreshSharedRecords();
+    };
+
+    void refreshSharedRecords();
+    subscribe();
+    const pollTimer = window.setInterval(() => {
+      if (!realtimeConnected.current && navigator.onLine) void refreshSharedRecords();
+    }, 60_000);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      active = false;
+      realtimeConnected.current = false;
+      window.clearInterval(pollTimer);
+      if (refreshDebounce !== null) window.clearTimeout(refreshDebounce);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('focus', handleFocus);
+      if (channel) void supabase.removeChannel(channel);
+    };
+  }, [refreshSharedRecords, user?.id]);
 
   // ── Navigation state ──
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
@@ -142,14 +216,13 @@ export const SuperAdminDashboard: React.FC = () => {
   const [rejectModalId, setRejectModalId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
-  // ── Delete school state ──
-  const [schoolToDelete, setSchoolToDelete] = useState<School | null>(null);
-
   // ── Invitation state ──
   const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteName, setInviteName] = useState('');
   const [inviteRole, setInviteRole] = useState<'principal' | 'regulator'>('principal');
-  const [generatedToken, setGeneratedToken] = useState<string | null>(null);
-  const [copyOk, setCopyOk] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteMessage, setInviteMessage] = useState<string | null>(null);
+  const [inviteBusy, setInviteBusy] = useState(false);
 
   // ── Audio state ──
   const [audioTitle, setAudioTitle] = useState('');
@@ -200,34 +273,33 @@ export const SuperAdminDashboard: React.FC = () => {
   // ── Helpers ──
   const isVilac = (s: School) => s.id === MOCK_VILAC_SCHOOL.id;
 
-  const handleIssueInvite = (e: React.FormEvent) => {
+  const handleIssueInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteEmail.trim() || !selectedSchool) return;
-    const inv = createInvitation(inviteEmail.trim(), inviteRole, selectedSchool.id, selectedSchool.name);
-    setGeneratedToken(inv.token);
-    setInviteEmail('');
-  };
-
-  const copyToken = (t: string) => {
-    navigator.clipboard.writeText(t);
-    setCopyOk(true);
-    setTimeout(() => setCopyOk(false), 2000);
-  };
-
-  const handleConfirmDeleteSchool = () => {
-    if (!schoolToDelete) return;
-    deleteSchool(schoolToDelete.id);
-    setSchools(prev => prev.filter(s => s.id !== schoolToDelete.id));
+    if (!inviteEmail.trim() || !inviteName.trim() || !selectedSchool) return;
+    setInviteError(null);
+    setInviteMessage(null);
+    setInviteBusy(true);
     try {
-      const deletedIds = JSON.parse(window.localStorage.getItem('bellnexa-deleted-schools') || '[]') as string[];
-      window.localStorage.setItem('bellnexa-deleted-schools', JSON.stringify([...new Set([...deletedIds, schoolToDelete.id])]));
-    } catch {
-      // Keep the current deletion in memory if browser storage is unavailable.
+      await createInvitation(inviteEmail.trim(), inviteName.trim(), inviteRole, selectedSchool.id);
+      setInviteEmail('');
+      setInviteName('');
+      setInviteMessage('Invitation created. Supabase accepted the email request; verify delivery because development SMTP may restrict recipients.');
+    } catch (error) {
+      setInviteError(error instanceof Error ? error.message : 'Unable to send the invitation.');
+    } finally {
+      setInviteBusy(false);
     }
-    if (selectedSchool?.id === schoolToDelete.id) {
-      setSelectedSchool(null);
+  };
+
+  const handleRevokeInvitation = async (id: string) => {
+    setInviteError(null);
+    setInviteMessage(null);
+    try {
+      await revokeInvitation(id);
+      setInviteMessage('Invitation revoked. Its pending account has been removed.');
+    } catch (error) {
+      setInviteError(error instanceof Error ? error.message : 'Unable to revoke the invitation.');
     }
-    setSchoolToDelete(null);
   };
 
   const openAddModal = () => {
@@ -327,6 +399,33 @@ export const SuperAdminDashboard: React.FC = () => {
           <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
             Registered Schools — Click to Enter Full Workspace
           </h2>
+          {schoolsLoading && (
+            <p className="rounded-xl border border-slate-800 bg-slate-900 p-4 text-xs text-slate-300">
+              Loading registered schools…
+            </p>
+          )}
+          {syncError && (
+            <p role="alert" className="rounded-xl border border-rose-800 bg-rose-950/40 p-4 text-xs text-rose-200">
+              {syncError}
+            </p>
+          )}
+          <p role="status" className="text-[11px] text-slate-400 px-1">
+            {syncStatus === 'connected'
+              ? 'Live updates connected'
+              : syncStatus === 'polling'
+                ? 'Live updates reconnecting; periodic refresh is active'
+                : syncStatus === 'offline'
+                  ? 'Offline; showing last loaded data'
+                  : syncStatus === 'error'
+                    ? 'Could not refresh shared data'
+                    : 'Connecting to live updates…'}
+            {lastDataSyncAt && ` · Last updated ${lastDataSyncAt.toLocaleTimeString()}`}
+          </p>
+          {!schoolsLoading && !syncError && schools.length === 0 && (
+            <p className="rounded-xl border border-slate-800 bg-slate-900 p-4 text-xs text-slate-300">
+              No schools are registered in Supabase yet. School creation is not connected in this phase; register a school in Supabase before issuing invitations.
+            </p>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {schools.map((school) => (
               <div key={school.id} className="text-left bg-slate-900 border border-slate-800 hover:border-[#12C8E8] hover:shadow-lg hover:shadow-cyan-950/30 rounded-2xl p-5 transition-all duration-150 space-y-4">
@@ -369,11 +468,6 @@ export const SuperAdminDashboard: React.FC = () => {
                   </div>
                 </div>
                 </button>
-                <div className="flex justify-end border-t border-slate-800 pt-3">
-                  <button onClick={() => setSchoolToDelete(school)} className="flex items-center gap-1.5 text-xs font-bold text-rose-400 hover:text-rose-300" title={`Delete ${school.name}`}>
-                    <Trash2 className="w-3.5 h-3.5" /> Delete school
-                  </button>
-                </div>
               </div>
             ))}
           </div>
@@ -392,25 +486,6 @@ export const SuperAdminDashboard: React.FC = () => {
           </div>
         </div>
 
-        {schoolToDelete && (
-          <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div role="alertdialog" aria-modal="true" aria-labelledby="delete-school-title" className="bg-slate-900 border border-rose-900/70 rounded-xl max-w-md w-full p-5 shadow-2xl space-y-4">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
-                <div>
-                  <h2 id="delete-school-title" className="text-base font-bold text-white">Delete {schoolToDelete.name}?</h2>
-                  <p className="mt-2 text-sm text-slate-300">This pilot removes the school, its invitations and school-owned data, including schedules, approvals and playback history. A connected Supabase deployment also removes school memberships; global sign-in accounts are retained.</p>
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 border-t border-slate-800 pt-3">
-                <button onClick={() => setSchoolToDelete(null)} className="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-300">Cancel</button>
-                <button onClick={handleConfirmDeleteSchool} className="flex items-center gap-1.5 px-3 py-2 bg-rose-700 hover:bg-rose-600 rounded-lg text-xs font-bold text-white">
-                  <Trash2 className="w-3.5 h-3.5" /> Delete school
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
@@ -869,7 +944,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 <Key className="w-4 h-4" /><span>Super Admin Exclusive</span>
               </div>
               <h3 className="text-base font-bold text-white">Invite Principal or Regulator</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Single-use tokens. Recipients activate from the sign-in page.</p>
+              <p className="text-xs text-slate-400 mt-0.5">Creates a single-use, one-hour Supabase Auth invitation. Delivery depends on the project email settings.</p>
             </div>
 
             <form onSubmit={handleIssueInvite} className="space-y-4 text-xs">
@@ -895,28 +970,30 @@ export const SuperAdminDashboard: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-bold text-slate-300 mb-1">Recipient Email</label>
-                <input type="email" required value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
-                  placeholder={`e.g. ${inviteRole}@${selectedSchool.code.toLowerCase()}.edu.gh`}
+                <label className="block font-bold text-slate-300 mb-1" htmlFor="invite-name">Recipient Name</label>
+                <input id="invite-name" type="text" required maxLength={120} value={inviteName} onChange={e => setInviteName(e.target.value)}
+                  placeholder="Full name"
                   className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-[#12C8E8]" />
               </div>
 
-              <button type="submit" className="w-full py-3 bg-[#12C8E8] hover:bg-[#087F9B] text-white font-extrabold rounded-xl shadow-lg transition flex items-center justify-center space-x-2">
-                <Send className="w-4 h-4" /><span>Generate Token</span>
+              <div>
+                <label className="block font-bold text-slate-300 mb-1" htmlFor="invite-email">Recipient Email</label>
+                <input type="email" required value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
+                  id="invite-email" autoComplete="email"
+                  placeholder="name@example.com"
+                  className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-[#12C8E8]" />
+              </div>
+
+              <button type="submit" disabled={inviteBusy} className="w-full py-3 bg-[#12C8E8] hover:bg-[#087F9B] disabled:opacity-60 text-white font-extrabold rounded-xl shadow-lg transition flex items-center justify-center space-x-2">
+                <Send className="w-4 h-4" /><span>{inviteBusy ? 'Sending invitation…' : 'Send secure invitation'}</span>
               </button>
             </form>
 
-            {generatedToken && (
-              <div className="p-3 rounded-xl bg-cyan-950/30 border border-cyan-700/50 space-y-2">
-                <div className="flex items-center justify-between text-[10px] font-bold uppercase text-cyan-400">
-                  <span>Generated Token</span>
-                  {copyOk && <span className="text-emerald-400">Copied!</span>}
-                </div>
-                <div className="flex items-center justify-between p-2 bg-slate-950 border border-slate-800 rounded-lg font-mono text-xs text-white">
-                  <span>{generatedToken}</span>
-                  <button onClick={() => copyToken(generatedToken)} className="p-1 hover:text-[#54DDF4]"><Copy className="w-4 h-4" /></button>
-                </div>
-              </div>
+            {inviteError && (
+              <p role="alert" className="rounded-lg border border-rose-800 bg-rose-950/40 p-3 text-xs text-rose-200">{inviteError}</p>
+            )}
+            {inviteMessage && (
+              <p role="status" className="rounded-lg border border-emerald-800 bg-emerald-950/40 p-3 text-xs text-emerald-200">{inviteMessage}</p>
             )}
           </div>
 
@@ -935,12 +1012,23 @@ export const SuperAdminDashboard: React.FC = () => {
                     }`}>{inv.role}</span>
                   </div>
                   <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-                    <span className="text-[#54DDF4]">{inv.token}</span>
-                    <span>Expires: {inv.expires_at}</span>
+                    <span>Expires: {new Date(inv.expires_at).toLocaleString()}</span>
+                    <span>{inv.is_used ? 'Activated' : inv.revoked_at ? 'Revoked' : Date.parse(inv.expires_at) <= now.getTime() ? 'Expired' : 'Pending'}</span>
                   </div>
                   <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-800/80">
-                    <span>{inv.is_used ? 'Account Activated' : 'Pending Activation'}</span>
-                    <button onClick={() => revokeInvitation(inv.id)} className="text-rose-400 hover:underline font-bold">Revoke</button>
+                    <span>{inv.is_used ? 'Account activated' : 'Activation by email'}</span>
+                    {!inv.is_used && !inv.revoked_at && (
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Revoke the invitation for ${inv.email}? Its pending account will be removed.`)) {
+                            void handleRevokeInvitation(inv.id);
+                          }
+                        }}
+                        className="text-rose-400 hover:underline font-bold"
+                      >
+                        Revoke
+                      </button>
+                    )}
                   </div>
                 </div>
               ))

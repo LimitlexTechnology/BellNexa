@@ -6,6 +6,8 @@ export interface Profile {
   full_name: string;
   phone?: string;
   is_super_admin: boolean;
+  is_active: boolean;
+  must_change_password: boolean;
   role?: UserRole;
   requires_2fa?: boolean;
   created_at: string;
@@ -163,12 +165,12 @@ export interface SupportTicket {
 export interface Invitation {
   id: string;
   school_id: string;
-  school_name: string;
+  school_name?: string;
   email: string;
-  role: 'principal' | 'regulator';
-  token: string;
+  role: Exclude<UserRole, 'super_admin'>;
   expires_at: string;
   is_used: boolean;
+  revoked_at: string | null;
   invited_by: string;
   created_at: string;
 }

@@ -14,6 +14,7 @@ export const Login: React.FC = () => {
     updatePassword,
     mfaSetup,
     isPasswordRecovery,
+    requiresPasswordSetup,
     isLoading,
     authError,
   } = useAuth();
@@ -23,9 +24,16 @@ export const Login: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [authCode, setAuthCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('error_code') ?? params.get('error');
+    return code === 'otp_expired' || code === 'access_denied'
+      ? 'This email link is invalid or expired. Request a new password reset or ask your administrator to resend the invitation.'
+      : null;
+  });
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
-  const visibleStep = isPasswordRecovery ? 'new-password' : step;
+  const visibleStep = requiresPasswordSetup || isPasswordRecovery ? 'new-password' : step;
 
   const handleSignIn = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -329,8 +337,14 @@ export const Login: React.FC = () => {
               {visibleStep === 'new-password' && (
                 <form onSubmit={handlePasswordUpdate} className="space-y-5">
                   <div>
-                    <h3 className="text-sm font-extrabold text-slate-900">Choose a new password</h3>
-                    <p className="text-xs text-slate-600 mt-1">Use at least 8 characters. You will need to sign in again after updating it.</p>
+                    <h3 className="text-sm font-extrabold text-slate-900">
+                      {requiresPasswordSetup ? 'Set up your password' : 'Choose a new password'}
+                    </h3>
+                    <p className="text-xs text-slate-600 mt-1">
+                      {requiresPasswordSetup
+                        ? 'Choose a password to activate your invited BellNexa account. You will sign in with it after setup.'
+                        : 'Use at least 8 characters. You will need to sign in again after updating it.'}
+                    </p>
                   </div>
                   <label htmlFor="new-password" className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
                     New Password

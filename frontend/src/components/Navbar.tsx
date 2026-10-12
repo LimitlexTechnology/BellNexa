@@ -22,7 +22,9 @@ export const Navbar: React.FC = () => {
     role, 
     logout,
     setBellPhoneMode,
-    updateProfile
+    updateProfile,
+    accountSyncStatus,
+    accountSyncError
   } = useAuth();
   const { availableVoices, selectedVoiceURI, setSpeechVoice, speakAnnouncement } = useBellState();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -87,16 +89,29 @@ export const Navbar: React.FC = () => {
             <span className="font-bold text-white">{currentSchool.name}</span>
             <span className="ml-1.5 text-[10px] text-[#54DDF4] font-mono">({currentSchool.code})</span>
           </div>
-          <span className="flex h-2 w-2 relative ml-1">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-          </span>
         </div>
       )}
 
       {/* Right Controls: Bell Phone Kiosk Switcher & User Profile */}
       <div className="flex items-center space-x-3 sm:space-x-4">
-        
+        <span
+          role="status"
+          aria-live="polite"
+          title={accountSyncError || `Account data: ${accountSyncStatus}`}
+          className="flex items-center gap-1.5 text-[10px] text-slate-300"
+        >
+          <span className={`h-2 w-2 rounded-full ${
+            accountSyncStatus === 'connected' ? 'bg-emerald-500' :
+            accountSyncStatus === 'offline' || accountSyncStatus === 'error' ? 'bg-rose-500' : 'bg-amber-400'
+          }`} />
+          <span className="hidden sm:inline">
+            {accountSyncStatus === 'connected' ? 'Live' :
+              accountSyncStatus === 'polling' ? 'Polling' :
+                accountSyncStatus === 'offline' ? 'Offline' :
+                  accountSyncStatus === 'error' ? 'Sync issue' : 'Syncing'}
+          </span>
+        </span>
+
         {/* Button to open the dedicated School Bell Phone Kiosk screen */}
         <button
           onClick={() => setBellPhoneMode(true)}
