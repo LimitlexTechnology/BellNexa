@@ -138,7 +138,7 @@ export interface DeviceCommand {
   school_id: string;
   device_id: string;
   command_type: 'sync_schedule' | 'sync_audio' | 'run_diagnostic' | 'pause_ringing' | 'resume_ringing' | 'play_test_announcement' | 'emergency_stop';
-  payload?: Record<string, any>;
+  payload?: Record<string, unknown>;
   status: 'pending' | 'executed' | 'expired' | 'failed';
   created_by?: string;
   expires_at: string;
@@ -180,6 +180,6 @@ export interface AuditLog {
   action: string;
   resource_type: string;
   resource_id?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   created_at: string;
 }

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   Building2,
   Smartphone,
-  UserPlus,
   ShieldAlert,
   CheckCircle2,
   Clock,
@@ -28,14 +27,11 @@ import {
   X,
   History,
   ChevronLeft,
-  Wifi,
-  BatteryCharging,
-  Radio,
   UserCheck
 } from 'lucide-react';
 import { useBellState } from '../context/BellStateContext';
 import { useAuth, MOCK_VILAC_SCHOOL } from '../context/AuthContext';
-import { School, SupportTicket, ScheduleEvent, EventCategory, EventApprovalStatus } from '../types/database';
+import { School, SupportTicket, ScheduleEvent, EventCategory } from '../types/database';
 import { VilacEmblem } from '../components/VilacEmblem';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -67,7 +63,6 @@ export const SuperAdminDashboard: React.FC = () => {
     speakerConnected,
     isRingingNow,
     activeRingingEvent,
-    deviceOnline,
     lastSyncTime,
     scheduleRevision,
     // Regulator powers

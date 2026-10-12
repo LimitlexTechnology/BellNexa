@@ -7,8 +7,7 @@ import {
   LifeBuoy, 
   ShieldAlert, 
   Settings,
-  Building2,
-  ListOrdered
+  Building2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 

@@ -1,18 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Bell, 
-  Clock, 
   Volume2, 
   VolumeX, 
-  Radio, 
   ShieldAlert, 
-  RotateCw, 
   BatteryCharging, 
   Wifi, 
   CheckCircle2, 
-  AlertTriangle,
   ArrowLeft,
-  Sliders
 } from 'lucide-react';
 import { useBellState } from '../context/BellStateContext';
 import { useAuth } from '../context/AuthContext';

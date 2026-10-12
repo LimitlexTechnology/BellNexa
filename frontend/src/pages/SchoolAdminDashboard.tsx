@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Bell, 
   Clock, 
   Smartphone, 
-  CheckCircle2, 
   Play, 
   Plus, 
   Volume2, 
@@ -17,7 +15,6 @@ import {
   Save,
   RotateCw
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
 import { ScheduleEvent, EventCategory } from '../types/database';
 
 const WEEKDAYS = [
@@ -31,9 +28,7 @@ const WEEKDAYS = [
 ];
 
 export const SchoolAdminDashboard: React.FC = () => {
-  const { currentSchool } = useAuth();
   const [currentTime, setCurrentTime] = useState<string>('');
-  const [isPlayingTest, setIsPlayingTest] = useState<boolean>(false);
   const [testAudioStatus, setTestAudioStatus] = useState<string | null>(null);
 
   // Modal & Edit State
@@ -192,7 +187,6 @@ export const SchoolAdminDashboard: React.FC = () => {
 
   // Repeats speech playback THRICE (or repeat_count times)
   const handleTestAudio = (eventName: string, text?: string, repeatTimes: number = 3) => {
-    setIsPlayingTest(true);
     setTestAudioStatus(`Playing "${eventName}" (Repeating ${repeatTimes}x Thrice)...`);
 
     if ('speechSynthesis' in window && text) {
@@ -201,7 +195,6 @@ export const SchoolAdminDashboard: React.FC = () => {
 
       const speakNext = () => {
         if (currentIteration >= repeatTimes) {
-          setIsPlayingTest(false);
           setTestAudioStatus(null);
           return;
         }
@@ -217,7 +210,6 @@ export const SchoolAdminDashboard: React.FC = () => {
             // Brief 1.2s pause between repetitions
             setTimeout(speakNext, 1200);
           } else {
-            setIsPlayingTest(false);
             setTestAudioStatus(null);
           }
         };
@@ -227,7 +219,6 @@ export const SchoolAdminDashboard: React.FC = () => {
       speakNext();
     } else {
       setTimeout(() => {
-        setIsPlayingTest(false);
         setTestAudioStatus(null);
       }, 4000);
     }
@@ -350,7 +341,7 @@ export const SchoolAdminDashboard: React.FC = () => {
             <Volume2 className="w-4 h-4 text-bellnexa-cyanBright animate-bounce" />
             <span>{testAudioStatus}</span>
           </div>
-          <button onClick={() => { window.speechSynthesis.cancel(); setTestAudioStatus(null); setIsPlayingTest(false); }} className="text-slate-400 hover:text-white">
+          <button onClick={() => { window.speechSynthesis.cancel(); setTestAudioStatus(null); }} className="text-slate-400 hover:text-white">
             <VolumeX className="w-4 h-4" />
           </button>
         </div>

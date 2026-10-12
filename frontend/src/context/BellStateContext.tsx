@@ -4,7 +4,6 @@ import {
   PendingApproval, 
   PlaybackEvent, 
   AuditLog, 
-  Device,
   Invitation 
 } from '../types/database';
 import { useAuth } from './AuthContext';
@@ -370,12 +369,15 @@ const INITIAL_INVITATIONS: Invitation[] = [
   }
 ];
 
+const DEMO_AUDIT_SEEDED_AT = Date.now();
+
 const BellStateContext = createContext<BellStateContextType | undefined>(undefined);
 
 // Web Audio chime synthesizer for real sound feedback in browser
 const playChimeSound = () => {
   try {
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    const AudioContextClass = window.AudioContext ||
+      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextClass) return;
     const ctx = new AudioContextClass();
     
@@ -570,21 +572,21 @@ export const BellStateProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       action: 'DEVICE_HEARTBEAT_ACK',
       resource_type: 'device',
       metadata: { device_id: 'VILAC-HW01', battery: 94, speaker: 'CONNECTED' },
-      created_at: new Date(Date.now() - 120000).toISOString(),
+      created_at: new Date(DEMO_AUDIT_SEEDED_AT - 120000).toISOString(),
     },
     {
       id: 'log-2',
       action: 'SCHEDULE_DRAFT_SUBMITTED',
       resource_type: 'schedule_event',
       metadata: { submitted_by: 'regulator@vilac.edu.gh', event: 'Lunch Break Bell (+15 min)' },
-      created_at: new Date(Date.now() - 7200000).toISOString(),
+      created_at: new Date(DEMO_AUDIT_SEEDED_AT - 7200000).toISOString(),
     },
     {
       id: 'log-3',
       action: 'INVITATION_ISSUED',
       resource_type: 'invitation',
       metadata: { target_role: 'principal', email: 'principal@vilac.edu.gh' },
-      created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
+      created_at: new Date(DEMO_AUDIT_SEEDED_AT - 86400000 * 2).toISOString(),
     }
   ]);
 

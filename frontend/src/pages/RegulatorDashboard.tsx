@@ -1,27 +1,18 @@
 import React, { useState } from 'react';
 import { 
-  Calendar, 
-  Clock, 
   Plus, 
   Play, 
   Volume2, 
   Upload, 
   Send, 
   CheckCircle2, 
-  AlertCircle, 
   Edit3, 
   Trash2, 
-  FileAudio, 
-  Headphones, 
-  Check, 
-  X,
-  VolumeX,
-  RotateCw,
-  Sparkles
+  Headphones
 } from 'lucide-react';
 import { useBellState } from '../context/BellStateContext';
 import { useAuth } from '../context/AuthContext';
-import { ScheduleEvent, EventCategory, EventApprovalStatus } from '../types/database';
+import { ScheduleEvent, EventCategory } from '../types/database';
 
 const DAYS = [
   { id: 1, name: 'Monday', short: 'Mon' },

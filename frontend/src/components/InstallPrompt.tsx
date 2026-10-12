@@ -24,11 +24,30 @@ const markDismissed = () => {
   }
 };
 
+const getInstallInstructions = () => {
+  if (typeof window === 'undefined') {
+    return { showIOSInstructions: false, showBrowserInstructions: false };
+  }
+
+  const isStandalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    ('standalone' in navigator && navigator.standalone === true);
+  if (isStandalone) return { showIOSInstructions: false, showBrowserInstructions: false };
+
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isSafari = /safari/i.test(navigator.userAgent) && !/crios|fxios|edgios/i.test(navigator.userAgent);
+  const showIOSInstructions = isIOS && isSafari;
+  return {
+    showIOSInstructions,
+    showBrowserInstructions: !showIOSInstructions,
+  };
+};
+
 export const InstallPrompt: React.FC = () => {
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
-  const [showIOSInstructions, setShowIOSInstructions] = useState(false);
-  const [showBrowserInstructions, setShowBrowserInstructions] = useState(false);
+  const [instructions, setInstructions] = useState(getInstallInstructions);
   const [dismissed, setDismissed] = useState(wasDismissed);
+  const { showIOSInstructions, showBrowserInstructions } = instructions;
 
   useEffect(() => {
     const isStandalone =
@@ -40,22 +59,16 @@ export const InstallPrompt: React.FC = () => {
     const handleInstallPrompt = (event: Event) => {
       event.preventDefault();
       setInstallEvent(event as BeforeInstallPromptEvent);
-      setShowBrowserInstructions(false);
+      setInstructions({ showIOSInstructions: false, showBrowserInstructions: false });
     };
     const handleInstalled = () => {
       setInstallEvent(null);
-      setShowIOSInstructions(false);
-      setShowBrowserInstructions(false);
+      setInstructions({ showIOSInstructions: false, showBrowserInstructions: false });
       setDismissed(true);
     };
 
     window.addEventListener('beforeinstallprompt', handleInstallPrompt);
     window.addEventListener('appinstalled', handleInstalled);
-
-    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    const isSafari = /safari/i.test(navigator.userAgent) && !/crios|fxios|edgios/i.test(navigator.userAgent);
-    setShowIOSInstructions(isIOS && isSafari);
-    setShowBrowserInstructions(!(isIOS && isSafari));
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleInstallPrompt);
@@ -67,8 +80,7 @@ export const InstallPrompt: React.FC = () => {
     markDismissed();
     setDismissed(true);
     setInstallEvent(null);
-    setShowIOSInstructions(false);
-    setShowBrowserInstructions(false);
+    setInstructions({ showIOSInstructions: false, showBrowserInstructions: false });
   };
 
   const install = async () => {
