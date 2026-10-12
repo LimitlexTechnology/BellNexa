@@ -1,75 +1,71 @@
-# Implementation Plan: Fix Sign-In Bug
+# Implementation Plan: Fix Super Admin Sign-in Redirect Loop
 
 ## Root Cause Analysis
 
-After investigating the authentication flow in the BellNexa React + Vite + Supabase application, I've identified the following issues causing users to be redirected back to the login page after attempting to sign in:
+The redirect loop occurs because:
 
-### Primary Issue: Invalid Supabase Anon Key
-**File**: `frontend/.env.local`  
-**Line**: 2  
-**Problem**: The `VITE_SUPABASE_ANON_KEY` value is `sb_publishable_zzwoYsHPSGkKdKqebY04DA_Q_PITWcV`, which appears to be truncated or invalid. Supabase publishable keys are typically much longer (200+ characters). This invalid key causes authentication requests to fail silently, preventing session creation.
+1. **Missing SIGNED_IN handler**: The `onAuthStateChange` listener in AuthContext.tsx only handles `PASSWORD_RECOVERY` and `SIGNED_OUT` events. When Supabase fires `SIGNED_IN` after the session is established, nothing runs, so `isAuthenticated` remains false and App.tsx renders Login again.
 
-### Secondary Issue: Missing Auth Configuration Options
-**File**: `frontend/src/lib/supabase.ts`  
-**Lines**: 26  
-**Problem**: The Supabase client is created without explicit auth configuration options. While `@supabase/supabase-js` defaults to `persistSession: true` and `detectSessionInUrl: true`, explicitly setting these options ensures consistent behavior and makes the configuration clear.
+2. **Page reload during MFA wipes state**: On page load, `getSession()` calls `loadSession()` which calls `prepareAdminMFA()`. If MFA assurance is not `aal2`, `setPendingAccount()` is called but `setIsLoading(false)` runs without setting any user — so `isAuthenticated=false` and App.tsx renders Login, wiping out the pending MFA state.
 
-### Contributing Factors Identified:
-1. The `isSupabaseConfigured()` function (lines 29-39 in `supabase.ts`) only validates that keys exist and don't contain placeholder values, but doesn't validate key format or length
-2. No error handling for invalid API keys during client initialization
-3. The auth error from invalid credentials may not be surfaced clearly to the user
+3. **No INITIAL_SESSION handling**: Supabase v2 fires `INITIAL_SESSION` on page load, which is not handled, so the initial session restoration happens via the separate `getSession()` call rather than through the auth state change listener.
+
+4. **isLoading false while pendingAccount exists for super_admin**: When a super_admin is at the MFA step, `isLoading` becomes false even though `pendingAccount` is non-null and `isAuthenticated` is false. This causes App.tsx to render Login instead of showing the loading screen, which wipes the MFA state when Login remounts.
 
 ## Implementation Steps
 
-- [ ] 1. **Obtain valid Supabase credentials from the Supabase dashboard**
-      Navigate to the Supabase project dashboard at https://ajdblqtbyqrnrwzdipco.supabase.co (based on URL in .env.local), go to Settings → API, and copy the full `publishable key` (starts with `sb_publishable_` or the `anon` key which starts with `eyJ`). The key should be 200+ characters long.
-      Files: None (manual step)
-      Verify: Confirm the copied key is at least 200 characters long and matches the format from the Supabase dashboard.
+- [ ] 1. Add SIGNED_IN and INITIAL_SESSION event handling to onAuthStateChange listener in AuthContext.tsx.
+      When SIGNED_IN or INITIAL_SESSION fires with a session, call loadSession(event.session) to restore the account state and handle MFA flow for super_admin.
+      Files: c:\Users\kobby\OneDrive\Documentos\GitHub\BellNexa/frontend/src/context/AuthContext.tsx
+      Verify: `npm run build` — TypeScript compilation succeeds with no errors.
 
-- [ ] 2. **Update the .env.local file with the correct Supabase anon/publishable key**
-      Replace the truncated key in `frontend/.env.local` line 2 with the full key obtained from step 1.
-      Files: `c:\Users\kobby\OneDrive\Documentos\GitHub\BellNexa\frontend\.env.local`
-      Verify: Run `Get-Content "c:\Users\kobby\OneDrive\Documentos\GitHub\BellNexa\frontend\.env.local"` and confirm VITE_SUPABASE_ANON_KEY is 200+ characters.
+- [ ] 2. Keep isLoading true when pendingAccount is non-null for super_admin role.
+      Modify the isLoading state management so that when pendingAccount exists (super_admin is in MFA flow), isLoading remains true. This prevents App.tsx from rendering Login and wiping the MFA state.
+      Add a condition: after loadSession completes, only set isLoading(false) if pendingAccount is null OR the account is not super_admin.
+      Files: c:\Users\kobby\OneDrive\Documentos\GitHub\BellNexa/frontend/src/context/AuthContext.tsx
+      Verify: `npm run build` — TypeScript compilation succeeds.
 
-- [ ] 3. **Add explicit auth configuration to Supabase client initialization**
-      In `frontend/src/lib/supabase.ts` line 26, modify the `createClient` call to include explicit auth options: `auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true, storage: typeof window !== 'undefined' ? window.localStorage : undefined }`. This ensures session persistence works correctly and auth state changes are detected from URL parameters (important for email confirmation flows).
-      Files: `c:\Users\kobby\OneDrive\Documentos\GitHub\BellNexa\frontend\src\lib\supabase.ts`
-      Verify: Run `npm run build` from the frontend directory and confirm no TypeScript errors.
+- [ ] 3. Remove redundant getSession call or make it idempotent with onAuthStateChange.
+      Since INITIAL_SESSION event now handles session restoration, the separate getSession() call in the useEffect becomes redundant. Two options:
+      Option A (recommended): Remove the getSession() call entirely and rely on INITIAL_SESSION event.
+      Option B: Keep both but add a flag to prevent double-processing of the initial session.
+      Decision: Remove the getSession() call and rely on INITIAL_SESSION, as this is the recommended Supabase v2 pattern and simplifies the code.
+      Files: c:\Users\kobby\OneDrive\Documentos\GitHub\BellNexa/frontend/src/context/AuthContext.tsx
+      Verify: `npm run build` — TypeScript compilation succeeds.
 
-- [ ] 4. **Enhance isSupabaseConfigured validation to check key format**
-      In `frontend/src/lib/supabase.ts`, update the `isSupabaseConfigured()` function (lines 29-39) to also validate that the anon key is at least 100 characters long and that the URL follows the pattern `https://*.supabase.co`. Add checks: `url.length > 20 && /^https:\/\/.+\.supabase\.co$/.test(url)` and `anonKey.length >= 100`.
-      Files: `c:\Users\kobby\OneDrive\Documentos\GitHub\BellNexa\frontend\src\lib\supabase.ts`
-      Verify: Run `npm run build` from the frontend directory and confirm no TypeScript errors.
+- [ ] 4. Ensure Login component respects requiresMFA/requiresMFASetup state during page reloads.
+      The Login component already checks requiresMFA and requiresMFASetup flags correctly to show the MFA step UI. However, with the fixes above, these flags will now persist through page reloads because isLoading will stay true and pendingAccount will be maintained.
+      No code changes needed in Login.tsx — this is verification only.
+      Files: c:\Users\kobby\OneDrive\Documentos\GitHub\BellNexa/frontend/src/pages/Login.tsx (verification only, no changes)
+      Verify: Manual test — sign in as super_admin, verify MFA screen appears, reload the page, verify MFA screen persists instead of returning to credentials form.
 
-- [ ] 5. **Clear browser storage and test the sign-in flow**
-      Clear all browser localStorage and sessionStorage for the app (open DevTools → Application → Storage → Clear site data), restart the dev server with `npm run dev`, navigate to http://localhost:3000, and attempt to sign in with a valid test account. Confirm that after successful authentication, the user is directed to their appropriate dashboard (not back to the login page) and that the session persists after page refresh.
-      Files: None (testing step)
-      Verify: Sign in successfully, verify dashboard loads, refresh the page, confirm still authenticated without being redirected to login.
+- [ ] 5. Test the complete super_admin sign-in flow end-to-end.
+      - Test 1: Fresh sign-in with MFA setup — sign in as super_admin with no TOTP enrolled, verify QR code screen appears, complete setup, verify dashboard loads.
+      - Test 2: Sign-in with existing MFA — sign in as super_admin with TOTP already enrolled, verify 6-digit code screen appears, enter code, verify dashboard loads.
+      - Test 3: Page reload during MFA setup — sign in as super_admin, get to QR code screen, reload the page, verify QR code screen persists (not back to credentials).
+      - Test 4: Page reload during MFA verification — sign in as super_admin with enrolled TOTP, get to 6-digit code screen, reload the page, verify code entry screen persists.
+      - Test 5: MFA cancellation — sign in as super_admin, get to MFA screen, click "Cancel sign-in", verify return to credentials form and session is cleared.
+      Files: Manual testing against running app (`npm run dev`)
+      Verify: All five test scenarios pass without redirect loop or state loss.
 
-- [ ] 6. **Verify Supabase dashboard redirect URL configuration**
-      In the Supabase dashboard under Authentication → URL Configuration, confirm that `http://localhost:3000` is listed as the Site URL and that redirect URLs include `http://localhost:3000/**`. If deploying to production, also add the production domain with wildcard path.
-      Files: None (Supabase dashboard configuration)
-      Verify: Navigate to Supabase dashboard → Authentication → URL Configuration and confirm localhost URLs are present.
+- [ ] 6. Test regular user (non-super_admin) sign-in flow.
+      - Test 1: Sign in as principal/admin/regulator — verify direct redirect to dashboard without MFA.
+      - Test 2: Page reload after sign-in — verify session persists and dashboard remains loaded.
+      Files: Manual testing against running app (`npm run dev`)
+      Verify: Regular users can sign in and stay signed in through page reloads.
 
-- [ ] 7. **Test password recovery and invitation flows**
-      Test the password reset flow (click "Forgot password?" on login page, submit email, click link in email) and confirm it redirects back to the app correctly. If invitation flow is set up, test that invited users can activate their accounts.
-      Files: None (testing step)  
-      Verify: Complete password reset flow end-to-end, confirm redirect back to app with password change form, successfully set new password and sign in.
+## Additional Notes
 
-## Notes
+- The Supabase client is configured with `autoRefreshToken: true` and `persistSession: true`, so session persistence across page reloads is already enabled at the client level.
+- The MFA flow for super_admin uses `supabase.auth.mfa.getAuthenticatorAssuranceLevel()` to check if aal2 (MFA) is satisfied. The fix ensures this check happens on every page load via the INITIAL_SESSION event.
+- The `passwordRecoveryRef` flag correctly prevents loadSession from running during password recovery flows — this logic should remain unchanged.
+- The account sync realtime subscriptions (watching profiles, school_memberships, schools tables) are independent of the sign-in flow and do not need changes.
 
-- **Critical**: The primary fix is obtaining the correct, complete Supabase anon/publishable key. The truncated key in `.env.local` will cause all auth operations to fail.
-- **Environment**: Changes to `.env.local` require restarting the Vite dev server (`npm run dev`) to take effect.
-- **Production deployment**: When deploying (using `npm run deploy:pages` or `npm run deploy:worker`), ensure the build environment has the correct `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` configured, as the build process embeds these values.
-- **Security**: Never commit `.env.local` to git. The `.env.example` file should contain placeholder values only.
-- **Testing**: Use a real test account with proper school membership to verify the full authentication flow, as the `getPendingAccount` function requires approved school memberships for non-super-admin users.
+## Expected Outcome
 
-## Relevant Files Examined
-
-- `frontend/src/lib/supabase.ts` - Supabase client initialization
-- `frontend/src/context/AuthContext.tsx` - Authentication state management and sign-in logic
-- `frontend/src/App.tsx` - Route logic that shows login vs dashboard
-- `frontend/src/pages/Login.tsx` - Login form component
-- `frontend/.env.local` - Environment variables (contains invalid key)
-- `frontend/package.json` - Dependencies (@supabase/supabase-js v2.117.3, @supabase/ssr v0.12.7)
-- `docs/registration-auth.md` - Documentation on auth setup and configuration requirements
+After implementing these changes:
+1. Super admin users can sign in, complete MFA (setup or verification), and reach their dashboard without being redirected back to the login page.
+2. Page reloads during the MFA flow preserve the MFA state instead of returning to the credentials form.
+3. Once authenticated, super admin users stay signed in through page reloads.
+4. Regular users (non-super_admin) continue to sign in normally without any MFA flow.
+5. The sign-in flow is driven by Supabase's auth state change events (SIGNED_IN, INITIAL_SESSION, SIGNED_OUT) rather than imperative getSession calls, following Supabase v2 best practices.
