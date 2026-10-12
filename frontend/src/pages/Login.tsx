@@ -13,6 +13,8 @@ export const Login: React.FC = () => {
     sendPasswordReset,
     updatePassword,
     mfaSetup,
+    requiresMFA,
+    requiresMFASetup,
     isPasswordRecovery,
     requiresPasswordSetup,
     isLoading,
@@ -33,7 +35,13 @@ export const Login: React.FC = () => {
       : null;
   });
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
-  const visibleStep = requiresPasswordSetup || isPasswordRecovery ? 'new-password' : step;
+  const visibleStep = requiresPasswordSetup || isPasswordRecovery
+    ? 'new-password'
+    : requiresMFASetup
+      ? 'setup-mfa'
+      : requiresMFA
+        ? 'mfa'
+        : step;
 
   const handleSignIn = async (event: React.FormEvent) => {
     event.preventDefault();

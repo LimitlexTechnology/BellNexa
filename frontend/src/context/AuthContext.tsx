@@ -33,6 +33,8 @@ interface AuthContextType {
   accountSyncError: string | null;
   isBellPhoneMode: boolean;
   mfaSetup: MfaSetup | null;
+  requiresMFA: boolean;
+  requiresMFASetup: boolean;
   isPasswordRecovery: boolean;
   requiresPasswordSetup: boolean;
   invitations: Invitation[];
@@ -180,7 +182,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setPendingAccount(null);
   }, []);
 
-  const prepareAdminMFA = async (account: PendingAccount): Promise<LoginResult> => {
+  const prepareAdminMFA = useCallback(async (account: PendingAccount): Promise<LoginResult> => {
     const { data: assurance, error: assuranceError } =
       await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     if (assuranceError) return { success: false, error: assuranceError.message };
@@ -213,22 +215,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       secret: enrollment.totp.secret,
     });
     return { success: true, requiresMFASetup: true };
-  };
+  }, [setAuthenticatedAccount]);
 
   const loadSession = useCallback(async (session: Session): Promise<void> => {
     const account = await getPendingAccount(session);
     if (account.role === 'super_admin') {
-      const { data: assurance, error } =
-        await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      if (error) throw error;
-      if (assurance.currentLevel !== 'aal2') {
-        const { error } = await supabase.auth.signOut({ scope: 'local' });
-        if (error) throw error;
-        return;
+      const result = await prepareAdminMFA(account);
+      if (!result.success) {
+        throw new Error(result.error || 'Super Admin MFA verification could not be started.');
       }
+      return;
     }
     setAuthenticatedAccount(account);
-  }, [setAuthenticatedAccount]);
+  }, [prepareAdminMFA, setAuthenticatedAccount]);
 
   useEffect(() => {
     let active = true;
@@ -608,6 +607,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         accountSyncError: user ? accountSyncError : null,
         isBellPhoneMode,
         mfaSetup,
+        requiresMFA: Boolean(pendingAccount && !mfaSetup),
+        requiresMFASetup: Boolean(pendingAccount && mfaSetup),
         isPasswordRecovery,
         requiresPasswordSetup,
         invitations,

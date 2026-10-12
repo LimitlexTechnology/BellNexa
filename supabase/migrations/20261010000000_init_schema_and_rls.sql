@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 
 -- 2. Schools Table
 CREATE TABLE IF NOT EXISTS public.schools (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
     name TEXT NOT NULL,
     code TEXT NOT NULL UNIQUE,
     timezone TEXT NOT NULL DEFAULT 'Africa/Accra',
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS public.schools (
 
 -- 3. School Memberships Table
 CREATE TABLE IF NOT EXISTS public.school_memberships (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
     school_id UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     role TEXT NOT NULL CHECK (role IN ('admin', 'support', 'auditor')),
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS public.school_memberships (
 
 -- 4. Single-Use Invitations Table
 CREATE TABLE IF NOT EXISTS public.invitations (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
     school_id UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
     email TEXT NOT NULL,
     role TEXT NOT NULL CHECK (role IN ('admin', 'support', 'auditor')),
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS public.invitations (
 
 -- 5. Registered Android Devices Table
 CREATE TABLE IF NOT EXISTS public.devices (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
     school_id UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
     device_name TEXT NOT NULL,
     device_hardware_id TEXT NOT NULL,
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS public.devices (
 
 -- 6. Bell Schedules Table
 CREATE TABLE IF NOT EXISTS public.schedules (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
     school_id UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     revision INT NOT NULL DEFAULT 1,
@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS public.schedules (
 
 -- 7. Audio Assets Metadata Table
 CREATE TABLE IF NOT EXISTS public.audio_assets (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
     school_id UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     file_path TEXT NOT NULL,
@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS public.audio_assets (
 
 -- 8. Schedule Events Table
 CREATE TABLE IF NOT EXISTS public.schedule_events (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
     schedule_id UUID NOT NULL REFERENCES public.schedules(id) ON DELETE CASCADE,
     school_id UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
     event_name TEXT NOT NULL,
@@ -120,7 +120,7 @@ CREATE TABLE IF NOT EXISTS public.schedule_events (
 
 -- 9. Device Sync State Table
 CREATE TABLE IF NOT EXISTS public.device_sync_state (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
     device_id UUID NOT NULL REFERENCES public.devices(id) ON DELETE CASCADE,
     school_id UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
     synced_revision INT NOT NULL DEFAULT 0,
@@ -132,7 +132,7 @@ CREATE TABLE IF NOT EXISTS public.device_sync_state (
 
 -- 10. Playback Audit Events Log Table (Offline buffered upload)
 CREATE TABLE IF NOT EXISTS public.playback_events (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
     school_id UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
     device_id UUID NOT NULL REFERENCES public.devices(id) ON DELETE CASCADE,
     event_id UUID REFERENCES public.schedule_events(id) ON DELETE SET NULL,
@@ -147,7 +147,7 @@ CREATE TABLE IF NOT EXISTS public.playback_events (
 
 -- 11. Remote Device Commands Queue Table
 CREATE TABLE IF NOT EXISTS public.device_commands (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
     school_id UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
     device_id UUID NOT NULL REFERENCES public.devices(id) ON DELETE CASCADE,
     command_type TEXT NOT NULL CHECK (command_type IN ('sync_schedule', 'sync_audio', 'run_diagnostic', 'pause_ringing', 'resume_ringing', 'play_test_announcement')),
@@ -160,7 +160,7 @@ CREATE TABLE IF NOT EXISTS public.device_commands (
 
 -- 12. Support Tickets Table
 CREATE TABLE IF NOT EXISTS public.support_tickets (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
     school_id UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES public.profiles(id),
     device_id UUID REFERENCES public.devices(id),
@@ -176,7 +176,7 @@ CREATE TABLE IF NOT EXISTS public.support_tickets (
 
 -- 13. Support Messages Thread Table
 CREATE TABLE IF NOT EXISTS public.support_messages (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
     ticket_id UUID NOT NULL REFERENCES public.support_tickets(id) ON DELETE CASCADE,
     sender_id UUID NOT NULL REFERENCES public.profiles(id),
     message TEXT NOT NULL,
@@ -185,7 +185,7 @@ CREATE TABLE IF NOT EXISTS public.support_messages (
 
 -- 14. Audit Logs Table (Append-Only)
 CREATE TABLE IF NOT EXISTS public.audit_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
     school_id UUID REFERENCES public.schools(id) ON DELETE SET NULL,
     user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
     action TEXT NOT NULL,
@@ -197,7 +197,7 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
 
 -- 15. School Settings Table
 CREATE TABLE IF NOT EXISTS public.school_settings (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
     school_id UUID NOT NULL UNIQUE REFERENCES public.schools(id) ON DELETE CASCADE,
     allow_late_playback BOOLEAN NOT NULL DEFAULT FALSE,
     emergency_contacts JSONB DEFAULT '[]'::jsonb,
